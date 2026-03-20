@@ -1,0 +1,55 @@
+# ──────────────────────────────────────────────
+# Inventario Clínica — .gitignore
+# ──────────────────────────────────────────────
+
+# ── Secrets / Entorno ──────────────────────────
+.env
+*.env.local
+*.env.production
+
+# ── Python ─────────────────────────────────────
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.so
+*.egg
+*.egg-info/
+dist/
+build/
+.venv/
+venv/
+env/
+.Python
+
+# ── Node / Next.js ─────────────────────────────
+node_modules/
+.next/
+.nuxt/
+out/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# ── Docker / Base de datos ─────────────────────
+pgdata/
+*.sql.backup
+docker-compose.override.yml
+
+# ── macOS ──────────────────────────────────────
+.DS_Store
+.AppleDouble
+.LSOverride
+Thumbs.db
+
+# ── IDEs ───────────────────────────────────────
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# ── Archivos temporales ────────────────────────
+*.log
+*.tmp
+*.backup
+*.broken
