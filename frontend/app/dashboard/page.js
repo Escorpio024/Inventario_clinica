@@ -49,6 +49,9 @@ export default function Dashboard() {
     const [editingProduct, setEditingProduct] = useState(null);
     const [editingLot, setEditingLot] = useState(null);
 
+    // Modal de confirmación personalizado (reemplaza confirm() nativo)
+    const [confirmModal, setConfirmModal] = useState({ show: false, message: "", onConfirm: null, danger: true });
+
     const isAdmin = userRole === "ADMIN";
 
     // Cargar token solo en cliente
@@ -147,22 +150,28 @@ export default function Dashboard() {
     }
 
     async function deleteUser(userId, email) {
-        if (!confirm(`¿Eliminar usuario '${email}'? Esta acción no se puede deshacer.`)) return;
-        try {
-            const res = await fetch(`${API}/users/${userId}`, {
-                method: "DELETE",
-                headers: { Authorization: `Bearer ${token}` }
-            });
-            const data = await res.json();
-            if (res.ok) {
-                showMessage(`✅ Usuario '${email}' eliminado`, "success");
-                loadData();
-            } else {
-                showMessage(`❌ ${data.detail || "Error eliminando"}`, "danger");
+        setConfirmModal({
+            show: true,
+            message: `¿Eliminar al usuario '${email}'? Esta acción no se puede deshacer.`,
+            danger: true,
+            onConfirm: async () => {
+                try {
+                    const res = await fetch(`${API}/users/${userId}`, {
+                        method: "DELETE",
+                        headers: { Authorization: `Bearer ${token}` }
+                    });
+                    const data = await res.json();
+                    if (res.ok) {
+                        showMessage(`✅ Usuario '${email}' eliminado`, "success");
+                        loadData();
+                    } else {
+                        showMessage(`❌ ${data.detail || "Error eliminando"}`, "danger");
+                    }
+                } catch {
+                    showMessage("❌ Error de conexión", "danger");
+                }
             }
-        } catch {
-            showMessage("❌ Error de conexión", "danger");
-        }
+        });
     }
 
     async function saveProduct(e) {
@@ -255,41 +264,53 @@ export default function Dashboard() {
     }
 
     async function deleteProduct(id) {
-        if (!confirm("¿Estás seguro de eliminar este producto?")) return;
-        try {
-            const res = await fetch(`${API}/products/${id}`, {
-                method: "DELETE",
-                headers: { Authorization: `Bearer ${token}` }
-            });
-            if (res.ok) {
-                showMessage("✅ Producto eliminado", "success");
-                loadData();
-            } else {
-                const err = await res.json();
-                showMessage(err.detail || "❌ Error eliminando producto", "danger");
+        setConfirmModal({
+            show: true,
+            message: "¿Estás seguro de eliminar este producto? Esta acción no se puede deshacer.",
+            danger: true,
+            onConfirm: async () => {
+                try {
+                    const res = await fetch(`${API}/products/${id}`, {
+                        method: "DELETE",
+                        headers: { Authorization: `Bearer ${token}` }
+                    });
+                    if (res.ok) {
+                        showMessage("✅ Producto eliminado", "success");
+                        loadData();
+                    } else {
+                        const err = await res.json();
+                        showMessage(err.detail || "❌ Error eliminando producto", "danger");
+                    }
+                } catch {
+                    showMessage("❌ Error de conexión", "danger");
+                }
             }
-        } catch {
-            showMessage("❌ Error de conexión", "danger");
-        }
+        });
     }
 
     async function deleteLot(id) {
-        if (!confirm("¿Estás seguro de eliminar este lote?")) return;
-        try {
-            const res = await fetch(`${API}/lots/${id}`, {
-                method: "DELETE",
-                headers: { Authorization: `Bearer ${token}` }
-            });
-            if (res.ok) {
-                showMessage("✅ Lote eliminado", "success");
-                loadData();
-            } else {
-                const err = await res.json();
-                showMessage(err.detail || "❌ Error eliminando lote", "danger");
+        setConfirmModal({
+            show: true,
+            message: "¿Estás seguro de eliminar este lote? Esta acción no se puede deshacer.",
+            danger: true,
+            onConfirm: async () => {
+                try {
+                    const res = await fetch(`${API}/lots/${id}`, {
+                        method: "DELETE",
+                        headers: { Authorization: `Bearer ${token}` }
+                    });
+                    if (res.ok) {
+                        showMessage("✅ Lote eliminado", "success");
+                        loadData();
+                    } else {
+                        const err = await res.json();
+                        showMessage(err.detail || "❌ Error eliminando lote", "danger");
+                    }
+                } catch {
+                    showMessage("❌ Error de conexión", "danger");
+                }
             }
-        } catch {
-            showMessage("❌ Error de conexión", "danger");
-        }
+        });
     }
 
     async function downloadExcel() {
@@ -1085,6 +1106,65 @@ export default function Dashboard() {
             )}
 
             {showScanner && <BarcodeScanner onScan={handleScan} onClose={() => setShowScanner(false)} />}
+
+            {/* Modal de confirmación personalizado */}
+            {confirmModal.show && (
+                <div style={{
+                    position: "fixed", inset: 0, background: "rgba(0,0,0,0.6)",
+                    display: "flex", alignItems: "center", justifyContent: "center",
+                    zIndex: 9999, padding: "1rem", backdropFilter: "blur(4px)"
+                }}>
+                    <div style={{
+                        background: "white", borderRadius: "1rem", padding: "2rem",
+                        maxWidth: "420px", width: "100%", boxShadow: "0 25px 50px rgba(0,0,0,0.25)",
+                        animation: "slideUp 0.2s ease-out"
+                    }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: "1rem", marginBottom: "1.25rem" }}>
+                            <div style={{
+                                width: "44px", height: "44px", borderRadius: "50%", flexShrink: 0,
+                                background: confirmModal.danger ? "#fee2e2" : "#dbeafe",
+                                display: "flex", alignItems: "center", justifyContent: "center",
+                                fontSize: "1.4rem"
+                            }}>
+                                {confirmModal.danger ? "🗑️" : "❓"}
+                            </div>
+                            <div>
+                                <h3 style={{ margin: 0, fontSize: "1.05rem", fontWeight: "700", color: "#1e293b" }}>Confirmar acción</h3>
+                                <p style={{ margin: "0.35rem 0 0", fontSize: "0.9rem", color: "#64748b", lineHeight: 1.5 }}>
+                                    {confirmModal.message}
+                                </p>
+                            </div>
+                        </div>
+                        <div style={{ display: "flex", gap: "0.75rem", justifyContent: "flex-end" }}>
+                            <button
+                                onClick={() => setConfirmModal({ show: false, message: "", onConfirm: null })}
+                                style={{
+                                    padding: "0.6rem 1.25rem", borderRadius: "0.6rem", border: "1.5px solid #e2e8f0",
+                                    background: "white", color: "#475569", fontWeight: "600", cursor: "pointer",
+                                    fontSize: "0.9rem", transition: "all 0.15s"
+                                }}
+                            >
+                                Cancelar
+                            </button>
+                            <button
+                                onClick={() => {
+                                    if (confirmModal.onConfirm) confirmModal.onConfirm();
+                                    setConfirmModal({ show: false, message: "", onConfirm: null });
+                                }}
+                                style={{
+                                    padding: "0.6rem 1.25rem", borderRadius: "0.6rem", border: "none",
+                                    background: confirmModal.danger ? "linear-gradient(135deg,#ef4444,#dc2626)" : "linear-gradient(135deg,#6366f1,#4f46e5)",
+                                    color: "white", fontWeight: "700", cursor: "pointer",
+                                    fontSize: "0.9rem", boxShadow: confirmModal.danger ? "0 4px 12px rgba(239,68,68,0.4)" : "0 4px 12px rgba(99,102,241,0.4)",
+                                    transition: "all 0.15s"
+                                }}
+                            >
+                                {confirmModal.danger ? "Sí, eliminar" : "Confirmar"}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }
