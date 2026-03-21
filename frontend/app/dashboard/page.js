@@ -601,7 +601,7 @@ export default function Dashboard() {
                 )}
 
                 {/* KPI Cards */}
-                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(250px, 1fr))", gap: "1.5rem", marginBottom: "2rem" }}>
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: "1.5rem", marginBottom: "2rem" }}>
                     {[
                         { label: "Total Productos", value: products.length, gradient: "linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)", icon: "📦" },
                         { label: "Total Lotes", value: lots.length, gradient: "linear-gradient(135deg, #10b981 0%, #059669 100%)", icon: "🏷️" },
@@ -618,6 +618,24 @@ export default function Dashboard() {
                             </div>
                         </div>
                     ))}
+                    {/* KPI especial: Valor Total del Inventario */}
+                    {(() => {
+                        const totalValue = lots.reduce((sum, l) => sum + (l.qty_current * (l.unit_cost || 0)), 0);
+                        return (
+                            <div className="card" style={{ background: "linear-gradient(135deg, #0ea5e9 0%, #0284c7 100%)", color: "white", border: "none" }}>
+                                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+                                    <div>
+                                        <p style={{ fontSize: "0.875rem", opacity: 0.9, marginBottom: "0.5rem" }}>Valor Inventario</p>
+                                        <h3 style={{ fontSize: "1.6rem", fontWeight: "700", margin: 0 }}>
+                                            ${totalValue.toLocaleString("es", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                        </h3>
+                                    </div>
+                                    <span style={{ fontSize: "2.5rem" }}>💰</span>
+                                </div>
+                                <p style={{ fontSize: "0.7rem", opacity: 0.75, marginTop: "0.5rem", marginBottom: 0 }}>Stock actual × costo unitario</p>
+                            </div>
+                        );
+                    })()}
                 </div>
 
                 {/* Tabs */}
@@ -737,30 +755,78 @@ export default function Dashboard() {
                             ) : (
                                 <div style={{ overflowX: "auto" }}>
                                     <table>
-                                        <thead><tr><th>Producto</th><th>Nº Lote</th><th>Vence</th><th>Stock</th><th>Estado</th><th>Acciones</th></tr></thead>
+                                        <thead><tr>
+                                            <th>Producto</th>
+                                            <th>Nº Lote</th>
+                                            <th>Vence</th>
+                                            <th style={{ textAlign: "right" }}>Stock</th>
+                                            <th style={{ textAlign: "right" }}>Costo Unit.</th>
+                                            <th style={{ textAlign: "right" }}>Valor Lote</th>
+                                            <th style={{ textAlign: "right" }}>% Usado</th>
+                                            <th>Estado</th>
+                                            <th>Acciones</th>
+                                        </tr></thead>
                                         <tbody>
                                             {filteredLots.map(l => {
                                                 const product = products.find(p => p.id === l.product_id);
                                                 const status = getLotExpiryStatus(l.expiry_date);
+                                                const valorLote = l.qty_current * (l.unit_cost || 0);
+                                                const pctUsado = l.qty_initial > 0
+                                                    ? Math.round(((l.qty_initial - l.qty_current) / l.qty_initial) * 100)
+                                                    : 0;
+                                                const pctColor = pctUsado >= 90 ? "#ef4444" : pctUsado >= 60 ? "#f59e0b" : "#10b981";
                                                 return (
                                                     <tr key={l.id}>
                                                         <td style={{ fontWeight: "600" }}>{product?.name}</td>
                                                         <td style={{ fontFamily: "monospace" }}>{l.lot_number}</td>
                                                         <td>{new Date(l.expiry_date + "T12:00:00").toLocaleDateString("es")}</td>
-                                                        <td style={{ fontWeight: "600" }}>{l.qty_current}</td>
+                                                        <td style={{ textAlign: "right", fontWeight: "700" }}>{l.qty_current}</td>
+                                                        <td style={{ textAlign: "right", color: "#475569" }}>
+                                                            {l.unit_cost > 0 ? `$${Number(l.unit_cost).toLocaleString("es", { minimumFractionDigits: 2 })}` : <span style={{ color: "#cbd5e1" }}>—</span>}
+                                                        </td>
+                                                        <td style={{ textAlign: "right", fontWeight: "700", color: valorLote > 0 ? "#0284c7" : "#cbd5e1" }}>
+                                                            {valorLote > 0 ? `$${valorLote.toLocaleString("es", { minimumFractionDigits: 2 })}` : "—"}
+                                                        </td>
+                                                        <td style={{ textAlign: "right" }}>
+                                                            <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", justifyContent: "flex-end" }}>
+                                                                <div style={{ width: "48px", height: "6px", background: "#e2e8f0", borderRadius: "999px", overflow: "hidden" }}>
+                                                                    <div style={{ width: `${pctUsado}%`, height: "100%", background: pctColor, borderRadius: "999px", transition: "width 0.4s" }} />
+                                                                </div>
+                                                                <span style={{ fontSize: "0.75rem", fontWeight: "700", color: pctColor }}>{pctUsado}%</span>
+                                                            </div>
+                                                        </td>
                                                         <td>
                                                             <span style={{ background: status.bg, color: status.color, padding: "0.375rem 0.85rem", borderRadius: "999px", fontSize: "0.75rem", fontWeight: "700", border: `1px solid ${status.color}33`, whiteSpace: "nowrap" }}>
                                                                 {status.label}
                                                             </span>
                                                         </td>
-                                                        <td style={{ display: "flex", gap: "0.4rem" }}>
+                                                        <td>
                                                             <button onClick={() => { setEditingLot(l); setNewLot({ ...l }); setShowLotForm(true); }} style={{ background: "#e0f2fe", color: "#0284c7", border: "none", borderRadius: "0.5rem", padding: "0.375rem 0.625rem", cursor: "pointer", fontSize: "0.875rem", fontWeight: "700" }}>✏️ Editar</button>
-                                                            <button onClick={() => deleteLot(l.id)} title="Eliminar lote" style={{ background: "#fee2e2", color: "#dc2626", border: "none", borderRadius: "0.5rem", padding: "0.375rem 0.625rem", cursor: "pointer", fontSize: "0.875rem", fontWeight: "700", transition: "all 0.2s" }}>🗑️ Eliminar</button>
                                                         </td>
                                                     </tr>
                                                 );
                                             })}
                                         </tbody>
+                                        {/* Fila de totales */}
+                                        {filteredLots.length > 0 && (() => {
+                                            const totalStock = filteredLots.reduce((s, l) => s + l.qty_current, 0);
+                                            const totalValor = filteredLots.reduce((s, l) => s + l.qty_current * (l.unit_cost || 0), 0);
+                                            return (
+                                                <tfoot>
+                                                    <tr style={{ background: "#f8fafc", fontWeight: "700", borderTop: "2px solid #e2e8f0" }}>
+                                                        <td colSpan={3} style={{ color: "#64748b", fontSize: "0.8rem", textTransform: "uppercase", letterSpacing: "0.5px" }}>
+                                                            📊 {filteredLots.length} lotes mostrados
+                                                        </td>
+                                                        <td style={{ textAlign: "right", color: "#1e293b" }}>{totalStock}</td>
+                                                        <td></td>
+                                                        <td style={{ textAlign: "right", color: "#0284c7" }}>
+                                                            ${totalValor.toLocaleString("es", { minimumFractionDigits: 2 })}
+                                                        </td>
+                                                        <td colSpan={3}></td>
+                                                    </tr>
+                                                </tfoot>
+                                            );
+                                        })()}
                                     </table>
                                 </div>
                             )}
