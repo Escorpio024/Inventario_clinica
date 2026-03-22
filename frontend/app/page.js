@@ -67,7 +67,7 @@ export default function LoginPage() {
                             className="input"
                             value={email}
                             onChange={(e) => setEmail(e.target.value)}
-                            placeholder="admin@clinica.com"
+                            placeholder="ejemplo@ejemplo.com"
                             autoComplete="email"
                             required
                         />
@@ -113,14 +113,7 @@ export default function LoginPage() {
                     </button>
                 </form>
 
-                <div style={{ marginTop: "2rem", padding: "1rem", background: "#f9fafb", borderRadius: "0.5rem" }}>
-                    <p style={{ fontSize: "0.75rem", color: "#6b7280", textAlign: "center", marginBottom: "0.5rem" }}>
-                        Credenciales por defecto:
-                    </p>
-                    <p style={{ fontSize: "0.75rem", color: "#374151", textAlign: "center", fontFamily: "monospace" }}>
-                        admin@clinica.com / admin123
-                    </p>
-                </div>
+
             </div>
         </div>
     );

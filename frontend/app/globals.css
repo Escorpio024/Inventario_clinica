@@ -285,3 +285,123 @@ tbody tr:last-child td {
 .pulse {
     animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
 }
+
+/* 📱 Responsive Design for Mobile Devices */
+@media (max-width: 768px) {
+    body {
+        font-size: 14px;
+    }
+
+    .card {
+        padding: 1.25rem !important;
+        margin-bottom: 1rem;
+        width: 100% !important;
+        max-width: 100% !important;
+        border-radius: 1rem;
+    }
+
+    /* Modal wrappers to fit screen perfectly */
+    div[style*="alignItems: center"] > .card {
+        margin: 1rem !important;
+        max-height: 92vh !important;
+    }
+
+    /* Adjust tables to allow scrolling without breaking padding */
+    th, td {
+        padding: 0.75rem 0.5rem;
+        font-size: 0.85rem;
+    }
+
+    /* Form Fields full width and taller for touch targets */
+    .input {
+        width: 100% !important;
+        height: 48px;
+        font-size: 1rem;
+        margin-bottom: 0.5rem;
+    }
+
+    /* Action Buttons Mobile Tweaks */
+    .btn-primary, .btn-secondary {
+        width: 100%;
+        display: flex !important;
+        justify-content: center !important;
+        align-items: center !important;
+        height: 48px;
+        margin-top: 0.5rem;
+    }
+
+    /* Navbar Mobile Optimization */
+    nav {
+        padding: 1rem !important;
+    }
+    nav > div {
+        flex-direction: column !important;
+        gap: 1rem !important;
+    }
+    nav > div > div:first-child {
+        width: 100%;
+        justify-content: center !important;
+    }
+
+    .nav-actions {
+        width: 100% !important;
+        flex-direction: column !important;
+        gap: 0.75rem !important;
+    }
+    
+    .nav-tools {
+        width: 100% !important;
+        display: flex !important;
+        justify-content: space-between !important;
+        gap: 0.5rem !important;
+    }
+    
+    .nav-profile {
+        width: 100% !important;
+        display: flex !important;
+        justify-content: space-between !important;
+        align-items: center !important;
+        padding-top: 0.75rem;
+        border-top: 1px solid rgba(255,255,255,0.2);
+    }
+
+    /* Action buttons in Header */
+    #btn-excel, #btn-email-alert, #btn-refresh {
+        flex: 1; /* Make them stretch equally */
+        justify-content: center !important;
+        padding: 0.75rem 0.25rem !important;
+        font-size: 0.8rem !important;
+        height: 44px;
+        min-width: 0; /* Prevents flex blowout */
+        white-space: nowrap;
+    }
+    
+    #btn-logout {
+        padding: 0.5rem 1rem !important;
+        font-size: 0.8rem !important;
+        height: 40px;
+    }
+
+    /* Filters div flex logic */
+    div[style*="justifyContent: space-between"] > input.input,
+    div[style*="justifyContent: space-between"] > select.input {
+        flex: 1 1 100% !important;
+        max-width: 100% !important;
+    }
+
+    /* Make the tabs container horizontally scrollable on small screens */
+    .tabs-scroll {
+        flex-wrap: nowrap !important;
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+        padding-bottom: 8px;
+        width: 100%;
+        justify-content: flex-start !important;
+        margin-bottom: 1.5rem !important;
+    }
+    .tabs-scroll > button {
+        min-width: max-content;
+        flex: 0 0 auto;
+        padding: 0.5rem 1rem !important;
+    }
+}

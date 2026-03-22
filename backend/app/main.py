@@ -540,6 +540,86 @@ def report_inventory_lots(
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error generando reporte: {str(e)}")
 
+# ── Email Alerts ──────────────────────────────────────────────────────────────
+@app.post("/reports/email-alerts", tags=["reports"])
+def send_email_alerts(
+    db: Session = Depends(get_db),
+    u: User = Depends(get_current_user)
+):
+    if u.role != UserRole.ADMIN:
+        raise HTTPException(status_code=403, detail="Solo administradores")
+        
+    today = datetime.now().date()
+    thirty_days = today + timedelta(days=30)
+    
+    # 1. Lotes próximos a caducar (< 30 días)
+    expiring_lots = db.query(Lot).options(joinedload(Lot.product)).filter(
+        Lot.qty_current > 0,
+        Lot.expiry_date <= thirty_days
+    ).order_by(Lot.expiry_date.asc()).all()
+    
+    # 2. Productos bajo el stock mínimo (usando SQL puro para rapidez)
+    low_stock_query = text("""
+        SELECT p.name, p.min_stock, COALESCE(SUM(l.qty_current), 0) as total
+        FROM products p
+        LEFT JOIN lots l ON p.id = l.product_id
+        GROUP BY p.id, p.name, p.min_stock
+        HAVING COALESCE(SUM(l.qty_current), 0) < p.min_stock
+    """)
+    res_low = db.execute(low_stock_query).fetchall()
+    
+    # 3. Construir plantilla HTML
+    msg_html = f"<div style='font-family: sans-serif; max-width: 600px; margin: auto; padding: 20px; border: 1px solid #e2e8f0; border-radius: 10px;'>"
+    msg_html += f"<h2 style='color: #1e293b; border-bottom: 2px solid #e2e8f0; padding-bottom: 10px;'>📊 Reporte Automático de Inventario ({today})</h2>"
+    
+    msg_html += "<h3 style='color: #ef4444;'>🔴 Riesgo de Desabastecimiento (Bajo Mínimo)</h3><ul style='list-style: none; padding: 0;'>"
+    if not res_low:
+        msg_html += "<li style='padding: 10px; background: #f0fdf4; color: #15803d; border-radius: 5px;'>✓ Todos los productos tienen stock suficiente.</li>"
+    for r in res_low:
+        msg_html += f"<li style='padding: 10px; background: #fef2f2; margin-bottom: 5px; border-radius: 5px; border-left: 4px solid #ef4444;'>"
+        msg_html += f"<b>{r[0]}</b> <br> Quedan: <b>{r[2]}</b> (El mínimo permitido es {r[1]})</li>"
+    msg_html += "</ul>"
+    
+    msg_html += "<h3 style='color: #f59e0b; margin-top: 30px;'>⚠️ Lotes próximos a Caducar (<= 30 días)</h3><ul style='list-style: none; padding: 0;'>"
+    if not expiring_lots:
+        msg_html += "<li style='padding: 10px; background: #f0fdf4; color: #15803d; border-radius: 5px;'>✓ Ningún lote caduca pronto.</li>"
+    for l in expiring_lots:
+        product_name = l.product.name if l.product else 'Desconocido'
+        msg_html += f"<li style='padding: 10px; background: #fffbeb; margin-bottom: 5px; border-radius: 5px; border-left: 4px solid #f59e0b;'>"
+        msg_html += f"<b>{product_name}</b> (Lote: {l.lot_number}) <br> Vence: <b>{l.expiry_date}</b> | Stock Actual: {l.qty_current}</li>"
+    msg_html += "</ul></div>"
+    
+    # 4. Intentar enviar correo
+    import smtplib
+    from email.mime.text import MIMEText
+    from email.mime.multipart import MIMEMultipart
+    
+    smtp_server = os.getenv("SMTP_SERVER")
+    smtp_user = os.getenv("SMTP_USERNAME")
+    smtp_pass = os.getenv("SMTP_PASSWORD")
+    to_email = os.getenv("ADMIN_EMAIL", u.email)
+    
+    if smtp_server and smtp_user and smtp_pass:
+        try:
+            msg = MIMEMultipart("alternative")
+            msg["Subject"] = f"Alerta de Clínica: Inventario - {today}"
+            msg["From"] = smtp_user
+            msg["To"] = to_email
+            msg.attach(MIMEText(msg_html, "html"))
+            
+            with smtplib.SMTP_SSL(smtp_server, 465) as server:
+                server.login(smtp_user, smtp_pass)
+                server.sendmail(smtp_user, to_email, msg.as_string())
+                
+            logger.info(f"📧 Correo de alerta enviado a {to_email}")
+            return {"message": f"Reporte enviado con éxito a {to_email}"}
+        except Exception as e:
+            logger.error(f"Error enviando alertas SMTP: {e}")
+            raise HTTPException(500, f"Error SMTP de envío: {str(e)}")
+    else:
+        logger.warning(f"SIMULACRO CORREO (SMTP no configurado en .env):\n{msg_html}")
+        return {"message": "Analizado con éxito. Te faltó configurar tu correo SMTP en Render (.env) para recibir el email real. Revisa la consola para ver el simulacro."}
+
 # ── Health ────────────────────────────────────────────────────────────────────
 @app.get("/health", tags=["system"])
 def health_check():

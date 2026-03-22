@@ -21,6 +21,7 @@ export default function Dashboard() {
     const [searchMovements, setSearchMovements] = useState("");
     const [filterCategory, setFilterCategory] = useState("");
     const [filterStatus, setFilterStatus] = useState("");
+    const [filterProductStatus, setFilterProductStatus] = useState("");
 
     const [newProduct, setNewProduct] = useState({
         name: "", category: "Insumo", unit: "unidad", min_stock: 2, barcode: ""
@@ -31,8 +32,9 @@ export default function Dashboard() {
     });
 
     const [newMovement, setNewMovement] = useState({
-        type: "SALIDA", product_id: "", lot_id: "", qty: 1, reason: ""
+        type: "SALIDA", product_id: "", lot_id: "", qty: 1, reason: "", patient: "", doctor: "", destination: ""
     });
+    const [visibleRows, setVisibleRows] = useState(50);
 
     const [token, setToken] = useState(null);
     const [userEmail, setUserEmail] = useState("");
@@ -51,8 +53,31 @@ export default function Dashboard() {
 
     // Modal de confirmación personalizado (reemplaza confirm() nativo)
     const [confirmModal, setConfirmModal] = useState({ show: false, message: "", onConfirm: null, danger: true });
+    
+    // Estado para envío de reporte de correos
+    const [isSendingAlerts, setIsSendingAlerts] = useState(false);
 
     const isAdmin = userRole === "ADMIN";
+
+    // ⏱️ Auto Logout por inactividad (15 min)
+    useEffect(() => {
+        let timeoutId;
+        const resetTimer = () => {
+            clearTimeout(timeoutId);
+            timeoutId = setTimeout(() => {
+                localStorage.removeItem("token");
+                localStorage.removeItem("user_email");
+                window.location.href = "/";
+            }, 15 * 60 * 1000);
+        };
+        const events = ['mousedown', 'mousemove', 'keypress', 'scroll', 'touchstart'];
+        events.forEach(e => document.addEventListener(e, resetTimer));
+        resetTimer();
+        return () => {
+            events.forEach(e => document.removeEventListener(e, resetTimer));
+            clearTimeout(timeoutId);
+        };
+    }, []);
 
     // Cargar token solo en cliente
     useEffect(() => {
@@ -245,14 +270,19 @@ export default function Dashboard() {
                     product_id: parseInt(newMovement.product_id),
                     lot_id: parseInt(newMovement.lot_id),
                     qty,
-                    reason: newMovement.reason || null,
+                    reason: [
+                        newMovement.patient ? `Paciente: ${newMovement.patient}` : "",
+                        newMovement.doctor ? `Doc: ${newMovement.doctor}` : "",
+                        newMovement.destination ? `Área: ${newMovement.destination}` : "",
+                        newMovement.reason ? `Nota: ${newMovement.reason}` : ""
+                    ].filter(Boolean).join(" | ") || null,
                 })
             });
             if (res.ok) {
                 const data = await res.json();
                 showMessage(`✅ Movimiento registrado. Stock actual: ${data.qty_current}`, "success");
                 setShowMovementForm(false);
-                setNewMovement({ type: "SALIDA", product_id: "", lot_id: "", qty: 1, reason: "" });
+                setNewMovement({ type: "SALIDA", product_id: "", lot_id: "", qty: 1, reason: "", patient: "", doctor: "", destination: "" });
                 loadData();
             } else {
                 const err = await res.json();
@@ -308,6 +338,34 @@ export default function Dashboard() {
                     }
                 } catch {
                     showMessage("❌ Error de conexión", "danger");
+                }
+            }
+        });
+    }
+
+    // ── Email Alerts ──────────────────────────────────────────────────────────
+    async function sendEmailAlerts() {
+        setConfirmModal({
+            show: true,
+            message: "¿Deseas analizar el inventario actual y enviar el reporte automatizado de stock al Administrador?",
+            danger: false,
+            onConfirm: async () => {
+                setIsSendingAlerts(true);
+                try {
+                    const res = await fetch(`${API}/reports/email-alerts`, {
+                        method: "POST",
+                        headers: { Authorization: `Bearer ${token}` }
+                    });
+                    const data = await res.json().catch(() => ({}));
+                    if (res.ok) {
+                        showMessage(`📧 ${data.message}`, "success");
+                    } else {
+                        showMessage(`❌ ${data.detail || "Error enviando alerta"}`, "danger");
+                    }
+                } catch (err) {
+                    showMessage(`❌ Error de conexión: ${err.message}`, "danger");
+                } finally {
+                    setIsSendingAlerts(false);
                 }
             }
         });
@@ -432,7 +490,15 @@ export default function Dashboard() {
         const matchesSearch = p.name.toLowerCase().includes(searchProducts.toLowerCase()) ||
             (p.barcode && p.barcode.includes(searchProducts));
         const matchesCategory = !filterCategory || p.category === filterCategory;
-        return matchesSearch && matchesCategory;
+        
+        const totalStock = lots.filter(l => l.product_id === p.id).reduce((sum, l) => sum + l.qty_current, 0);
+        const isLow = totalStock < p.min_stock;
+        
+        let matchesStatus = true;
+        if (filterProductStatus === "OK") matchesStatus = !isLow;
+        if (filterProductStatus === "BAJO") matchesStatus = isLow;
+        
+        return matchesSearch && matchesCategory && matchesStatus;
     });
 
     const filteredLots = lots.filter(l => {
@@ -500,44 +566,60 @@ export default function Dashboard() {
                         <span style={{ fontSize: "2rem" }}>🏥</span>
                         <h1 style={{ color: "white", fontSize: "1.5rem", fontWeight: "700", margin: 0 }}>Inventario Clínica</h1>
                     </div>
-                    <div style={{ display: "flex", alignItems: "center", gap: "0.75rem", flexWrap: "wrap" }}>
-                        {/* Excel button - blanco sólido */}
-                        <button id="btn-excel" onClick={downloadExcel} style={{
-                            background: "white", color: "#667eea", fontWeight: "700",
-                            border: "none", padding: "0.6rem 1.2rem", borderRadius: "0.6rem",
-                            cursor: "pointer", fontSize: "0.875rem", display: "flex", alignItems: "center", gap: "0.4rem",
-                            boxShadow: "0 2px 8px rgba(0,0,0,0.15)", transition: "all 0.2s"
-                        }}>📊 Excel</button>
+                    <div className="nav-actions" style={{ display: "flex", alignItems: "center", gap: "1rem", flexWrap: "wrap" }}>
+                        <div className="nav-tools" style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+                            {/* Email Alert button */}
+                            {isAdmin && (
+                                <button id="btn-email-alert" onClick={sendEmailAlerts} disabled={isSendingAlerts} style={{
+                                    background: "white", color: "#f59e0b", fontWeight: "700", opacity: isSendingAlerts ? 0.7 : 1,
+                                    border: "none", padding: "0.6rem 1.2rem", borderRadius: "0.6rem",
+                                    cursor: isSendingAlerts ? "wait" : "pointer", fontSize: "0.875rem", display: "flex", alignItems: "center", gap: "0.4rem",
+                                    boxShadow: "0 2px 8px rgba(0,0,0,0.15)", transition: "all 0.2s"
+                                }}>
+                                    {isSendingAlerts ? "⏳ Enviando..." : "🔔 Alertas"}
+                                </button>
+                            )}
 
-                        {/* Refresh button - glass */}
-                        <button id="btn-refresh" onClick={loadData} title="Actualizar datos" style={{
-                            background: "rgba(255,255,255,0.15)", color: "white", fontWeight: "600",
-                            border: "1.5px solid rgba(255,255,255,0.5)", padding: "0.6rem 0.9rem",
-                            borderRadius: "0.6rem", cursor: "pointer", fontSize: "1rem",
-                            backdropFilter: "blur(4px)", transition: "all 0.2s"
-                        }}>🔄</button>
+                            {/* Excel button - blanco sólido */}
+                            <button id="btn-excel" onClick={downloadExcel} style={{
+                                background: "white", color: "#667eea", fontWeight: "700",
+                                border: "none", padding: "0.6rem 1.2rem", borderRadius: "0.6rem",
+                                cursor: "pointer", fontSize: "0.875rem", display: "flex", alignItems: "center", gap: "0.4rem",
+                                boxShadow: "0 2px 8px rgba(0,0,0,0.15)", transition: "all 0.2s"
+                            }}>📊 Excel</button>
 
-                        {/* User info */}
-                        <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end" }}>
-                            <span style={{ color: "white", fontSize: "0.875rem", fontWeight: "600" }}>{userFullName || userEmail}</span>
-                            <span style={{
-                                fontSize: "0.7rem", fontWeight: "700", padding: "0.1rem 0.5rem",
-                                borderRadius: "999px", marginTop: "0.2rem",
-                                background: isAdmin ? "rgba(255,215,0,0.25)" : "rgba(255,255,255,0.15)",
-                                color: isAdmin ? "#ffd700" : "rgba(255,255,255,0.9)",
-                                border: isAdmin ? "1px solid rgba(255,215,0,0.6)" : "1px solid rgba(255,255,255,0.3)"
-                            }}>
-                                {isAdmin ? "👑 ADMIN" : "👤 OPERADOR"}
-                            </span>
+                            {/* Refresh button - glass */}
+                            <button id="btn-refresh" onClick={loadData} title="Actualizar datos" style={{
+                                background: "rgba(255,255,255,0.15)", color: "white", fontWeight: "600",
+                                border: "1.5px solid rgba(255,255,255,0.5)", padding: "0.6rem 0.9rem",
+                                borderRadius: "0.6rem", cursor: "pointer", fontSize: "1rem",
+                                backdropFilter: "blur(4px)", transition: "all 0.2s"
+                            }}>🔄</button>
                         </div>
 
-                        {/* Logout button - rojo suave */}
-                        <button id="btn-logout" onClick={logout} style={{
-                            background: "rgba(239,68,68,0.85)", color: "white", fontWeight: "600",
-                            border: "1.5px solid rgba(239,68,68,0.5)", padding: "0.6rem 1.1rem",
-                            borderRadius: "0.6rem", cursor: "pointer", fontSize: "0.875rem",
-                            backdropFilter: "blur(4px)", transition: "all 0.2s"
-                        }}>🚪 Salir</button>
+                        <div className="nav-profile" style={{ display: "flex", alignItems: "center", gap: "1rem" }}>
+                            {/* User info */}
+                            <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end" }}>
+                                <span style={{ color: "white", fontSize: "0.875rem", fontWeight: "600" }}>{userFullName || userEmail}</span>
+                                <span style={{
+                                    fontSize: "0.7rem", fontWeight: "700", padding: "0.1rem 0.5rem",
+                                    borderRadius: "999px", marginTop: "0.2rem",
+                                    background: isAdmin ? "rgba(255,215,0,0.25)" : "rgba(255,255,255,0.15)",
+                                    color: isAdmin ? "#ffd700" : "rgba(255,255,255,0.9)",
+                                    border: isAdmin ? "1px solid rgba(255,215,0,0.6)" : "1px solid rgba(255,255,255,0.3)"
+                                }}>
+                                    {isAdmin ? "👑 ADMIN" : "👤 OPERADOR"}
+                                </span>
+                            </div>
+
+                            {/* Logout button - rojo suave */}
+                            <button id="btn-logout" onClick={logout} style={{
+                                background: "rgba(239,68,68,0.85)", color: "white", fontWeight: "600",
+                                border: "1.5px solid rgba(239,68,68,0.5)", padding: "0.6rem 1.1rem",
+                                borderRadius: "0.6rem", cursor: "pointer", fontSize: "0.875rem",
+                                backdropFilter: "blur(4px)", transition: "all 0.2s"
+                            }}>🚪 Salir</button>
+                        </div>
                     </div>
                 </div>
             </nav>
@@ -641,7 +723,7 @@ export default function Dashboard() {
                 {/* Tabs */}
                 <div style={{ background: "white", borderRadius: "1rem", padding: "1.5rem", boxShadow: "0 4px 12px rgba(0,0,0,0.1)" }}>
                     {/* Modern Pill Tabs */}
-                    <div style={{ display: "flex", gap: "0.5rem", marginBottom: "2rem", borderBottom: "1px solid #e2e8f0", padding: "0.25rem", background: "#f8fafc", borderRadius: "0.75rem", width: "fit-content", marginLeft: "-0.5rem" }}>
+                    <div className="tabs-scroll" style={{ display: "flex", gap: "0.5rem", marginBottom: "2rem", borderBottom: "1px solid #e2e8f0", padding: "0.25rem", background: "#f8fafc", borderRadius: "0.75rem", width: "100%", overflowX: "auto", overflowY: "hidden", whiteSpace: "nowrap" }}>
                         {[
                             { id: "products", label: "Productos", icon: "📦", count: products.length },
                             { id: "lots", label: "Lotes FEFO", icon: "🏷️", count: lots.length },
@@ -696,6 +778,11 @@ export default function Dashboard() {
                                     <option value="Equipo">Equipo</option>
                                     <option value="Material">Material</option>
                                 </select>
+                                <select id="filter-product-status" value={filterProductStatus} onChange={e => setFilterProductStatus(e.target.value)} className="input" style={{ width: "150px" }}>
+                                    <option value="">Todo Estado</option>
+                                    <option value="OK">✓ OK</option>
+                                    <option value="BAJO">⚠️ Bajo</option>
+                                </select>
                                 <button id="btn-new-product" onClick={() => setShowProductForm(true)} className="btn-primary">+ Nuevo</button>
                             </div>
                             {loading ? (
@@ -703,11 +790,12 @@ export default function Dashboard() {
                             ) : filteredProducts.length === 0 ? (
                                 <p style={{ textAlign: "center", padding: "2rem", color: "#9ca3af" }}>No hay productos</p>
                             ) : (
+                                <>
                                 <div style={{ overflowX: "auto" }}>
                                     <table>
                                         <thead><tr><th>Nombre</th><th>Categoría</th><th>Stock</th><th>Mín</th><th>Estado</th><th>Acciones</th></tr></thead>
                                         <tbody>
-                                            {filteredProducts.map(p => {
+                                            {filteredProducts.slice(0, visibleRows).map(p => {
                                                 const totalStock = lots.filter(l => l.product_id === p.id).reduce((sum, l) => sum + l.qty_current, 0);
                                                 const isLow = totalStock < p.min_stock;
                                                 return (
@@ -731,6 +819,12 @@ export default function Dashboard() {
                                         </tbody>
                                     </table>
                                 </div>
+                                {filteredProducts.length > visibleRows && (
+                                    <div style={{ textAlign: "center", marginTop: "1rem" }}>
+                                        <button onClick={() => setVisibleRows(prev => prev + 50)} className="btn-secondary" style={{ padding: "0.5rem 1rem", fontSize: "0.85rem" }}>↓ Mostrar más ({filteredProducts.length - visibleRows} restantes)</button>
+                                    </div>
+                                )}
+                                </>
                             )}
                         </div>
                     )}
@@ -753,6 +847,7 @@ export default function Dashboard() {
                             ) : filteredLots.length === 0 ? (
                                 <p style={{ textAlign: "center", padding: "2rem", color: "#9ca3af" }}>No hay lotes</p>
                             ) : (
+                                <>
                                 <div style={{ overflowX: "auto" }}>
                                     <table>
                                         <thead><tr>
@@ -767,7 +862,7 @@ export default function Dashboard() {
                                             <th>Acciones</th>
                                         </tr></thead>
                                         <tbody>
-                                            {filteredLots.map(l => {
+                                            {filteredLots.slice(0, visibleRows).map(l => {
                                                 const product = products.find(p => p.id === l.product_id);
                                                 const status = getLotExpiryStatus(l.expiry_date);
                                                 const valorLote = l.qty_current * (l.unit_cost || 0);
@@ -829,6 +924,12 @@ export default function Dashboard() {
                                         })()}
                                     </table>
                                 </div>
+                                {filteredLots.length > visibleRows && (
+                                    <div style={{ textAlign: "center", marginTop: "1rem" }}>
+                                        <button onClick={() => setVisibleRows(prev => prev + 50)} className="btn-secondary" style={{ padding: "0.5rem 1rem", fontSize: "0.85rem" }}>↓ Mostrar más ({filteredLots.length - visibleRows} restantes)</button>
+                                    </div>
+                                )}
+                                </>
                             )}
                         </div>
                     )}
@@ -845,11 +946,12 @@ export default function Dashboard() {
                             ) : filteredMovements.length === 0 ? (
                                 <p style={{ textAlign: "center", padding: "2rem", color: "#9ca3af" }}>No hay movimientos</p>
                             ) : (
+                                <>
                                 <div style={{ overflowX: "auto" }}>
                                     <table>
-                                        <thead><tr><th>Fecha</th><th>Tipo</th><th>Producto</th><th>Lote</th><th>Cant</th><th>Razón</th><th>Usuario</th></tr></thead>
+                                        <thead><tr><th>Fecha</th><th>Tipo</th><th>Producto</th><th>Lote</th><th>Cant</th><th>Razón / Trazabilidad</th><th>Usuario</th></tr></thead>
                                         <tbody>
-                                            {filteredMovements.map((m, idx) => {
+                                            {filteredMovements.slice(0, visibleRows).map((m, idx) => {
                                                 const typeColors = { "ENTRADA": "#10b981", "SALIDA": "#ef4444", "MERMA": "#f59e0b", "AJUSTE": "#6366f1" };
                                                 return (
                                                     <tr key={m.id || idx}>
@@ -870,6 +972,12 @@ export default function Dashboard() {
                                         </tbody>
                                     </table>
                                 </div>
+                                {filteredMovements.length > visibleRows && (
+                                    <div style={{ textAlign: "center", marginTop: "1rem" }}>
+                                        <button onClick={() => setVisibleRows(prev => prev + 50)} className="btn-secondary" style={{ padding: "0.5rem 1rem", fontSize: "0.85rem" }}>↓ Mostrar más ({filteredMovements.length - visibleRows} restantes)</button>
+                                    </div>
+                                )}
+                                </>
                             )}
                         </div>
                     )}
@@ -1111,11 +1219,10 @@ export default function Dashboard() {
                             </div>
                             <div style={{ marginBottom: "1rem" }}>
                                 <label style={{ display: "block", marginBottom: "0.5rem", fontWeight: "500" }}>Tipo *</label>
-                                <select id="movement-type" className="input" value={newMovement.type} onChange={e => setNewMovement({ ...newMovement, type: e.target.value })}>
-                                    <option value="ENTRADA">📥 Entrada</option>
+                                <select id="movement-type" value={newMovement.type} onChange={e => setNewMovement({ ...newMovement, type: e.target.value })} className="input" required>
                                     <option value="SALIDA">📤 Salida</option>
-                                    <option value="MERMA">⚠️ Merma</option>
-                                    <option value="AJUSTE">🔧 Ajuste</option>
+                                    <option value="MERMA">🗑️ Merma</option>
+                                    <option value="AJUSTE">⚙️ Ajuste Especial</option>
                                 </select>
                             </div>
                             <div style={{ marginBottom: "1rem" }}>
@@ -1152,18 +1259,37 @@ export default function Dashboard() {
                             <div style={{ marginBottom: "1rem" }}>
                                 <label style={{ display: "block", marginBottom: "0.5rem", fontWeight: "500" }}>Cantidad *</label>
                                 <input id="movement-qty" type="number" min="1" className="input" value={newMovement.qty} onChange={e => setNewMovement({ ...newMovement, qty: parseInt(e.target.value) || 1 })} required />
-                                {selectedLot && newMovement.qty > selectedLot.qty_current && newMovement.type !== "ENTRADA" && (
+                                {selectedLot && newMovement.qty > selectedLot.qty_current && newMovement.type !== "AJUSTE" && (
                                     <p style={{ fontSize: "0.8rem", color: "#ef4444", marginTop: "0.25rem" }}>
                                         ⚠️ Supera el stock disponible ({selectedLot.qty_current})
                                     </p>
                                 )}
                             </div>
+                            {(newMovement.type === "SALIDA" || newMovement.type === "MERMA") && (
+                                <div style={{ background: "#f8fafc", padding: "1rem", borderRadius: "0.5rem", marginBottom: "1rem", border: "1px solid #e2e8f0" }}>
+                                    <h4 style={{ margin: "0 0 0.75rem", color: "#475569", fontSize: "0.85rem", textTransform: "uppercase", letterSpacing: "0.5px" }}>🏥 Trazabilidad Médica (Opcional)</h4>
+                                    <div style={{ display: "grid", gap: "0.75rem", gridTemplateColumns: "repeat(auto-fit, minmax(130px, 1fr))" }}>
+                                        <div>
+                                            <label style={{ display: "block", marginBottom: "0.25rem", fontSize: "0.8rem", fontWeight: "600", color: "#64748b" }}>Paciente</label>
+                                            <input className="input" style={{ padding: "0.6rem", fontSize: "0.85rem" }} value={newMovement.patient} onChange={e => setNewMovement({ ...newMovement, patient: e.target.value })} placeholder="Nombre / CI" />
+                                        </div>
+                                        <div>
+                                            <label style={{ display: "block", marginBottom: "0.25rem", fontSize: "0.8rem", fontWeight: "600", color: "#64748b" }}>Médico autoriza</label>
+                                            <input className="input" style={{ padding: "0.6rem", fontSize: "0.85rem" }} value={newMovement.doctor} onChange={e => setNewMovement({ ...newMovement, doctor: e.target.value })} placeholder="Dr. Responsable" />
+                                        </div>
+                                        <div>
+                                            <label style={{ display: "block", marginBottom: "0.25rem", fontSize: "0.8rem", fontWeight: "600", color: "#64748b" }}>Sala/Destino</label>
+                                            <input className="input" style={{ padding: "0.6rem", fontSize: "0.85rem" }} value={newMovement.destination} onChange={e => setNewMovement({ ...newMovement, destination: e.target.value })} placeholder="Ej: UCI Cama 4" />
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
                             <div style={{ marginBottom: "1rem" }}>
-                                <label style={{ display: "block", marginBottom: "0.5rem", fontWeight: "500" }}>Razón</label>
-                                <input id="movement-reason" className="input" value={newMovement.reason} onChange={e => setNewMovement({ ...newMovement, reason: e.target.value })} placeholder="Opcional" />
+                                <label style={{ display: "block", marginBottom: "0.5rem", fontWeight: "500" }}>{newMovement.type === 'AJUSTE' ? 'Motivo del Ajuste *' : 'Notas adicionales'}</label>
+                                <input id="movement-reason" className="input" value={newMovement.reason} onChange={e => setNewMovement({ ...newMovement, reason: e.target.value })} placeholder="Observaciones generales..." required={newMovement.type === 'AJUSTE'} />
                             </div>
                             <div style={{ display: "flex", gap: "1rem", justifyContent: "flex-end" }}>
-                                <button type="button" className="btn-secondary" onClick={() => setShowMovementForm(false)}>Cancelar</button>
+                                <button type="button" className="btn-secondary" onClick={() => { setShowMovementForm(false); setNewMovement({ type: "SALIDA", product_id: "", lot_id: "", qty: 1, reason: "", patient: "", doctor: "", destination: "" }); }}>Cancelar</button>
                                 <button id="submit-movement" type="submit" className="btn-primary">Registrar</button>
                             </div>
                         </form>
