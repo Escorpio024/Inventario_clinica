@@ -13,6 +13,31 @@ class Token(BaseModel):
     token_type: str
     role: str
     full_name: Optional[str] = None
+    empresa_id: Optional[int] = None
+    empresa_nombre: Optional[str] = None
+
+class SaaSRegister(BaseModel):
+    empresa_nombre: str = Field(..., min_length=2, max_length=200)
+    admin_email: str = Field(..., min_length=5)
+    admin_password: str = Field(..., min_length=6)
+    admin_name: str = Field(..., min_length=2)
+
+# ── Empresas ──────────────────────────────────────────────────────────────────
+class EmpresaCreate(BaseModel):
+    nombre: str = Field(..., min_length=2, max_length=200)
+    slug: Optional[str] = Field(None, max_length=100)   # auto-generado si no se envía
+    plan: str = "FREE"
+
+class EmpresaOut(BaseModel):
+    id: int
+    nombre: str
+    slug: str
+    plan: str
+    activa: int
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
 
 # ── Users ─────────────────────────────────────────────────────────────────────
 class UserCreate(BaseModel):
@@ -20,6 +45,7 @@ class UserCreate(BaseModel):
     password: str = Field(..., min_length=6)
     full_name: Optional[str] = Field(None, max_length=100)
     role: UserRole = UserRole.OPERADOR
+    empresa_id: Optional[int] = None
 
 class UserUpdate(BaseModel):
     full_name: Optional[str] = Field(None, max_length=100)
@@ -33,6 +59,7 @@ class UserOut(BaseModel):
     full_name: Optional[str]
     role: str
     is_active: int
+    empresa_id: Optional[int] = None
     created_at: datetime
 
     class Config:
@@ -41,14 +68,33 @@ class UserOut(BaseModel):
 # ── Products ──────────────────────────────────────────────────────────────────
 class ProductCreate(BaseModel):
     name: str = Field(..., min_length=1, max_length=200)
-    category: str = Field(..., pattern="^(Insumo|Medicamento|Equipo|Material)$")
+    category: str = Field(...)
     unit: str = Field(..., min_length=1, max_length=50)
     min_stock: int = Field(0, ge=0)
     barcode: Optional[str] = None
+    
+    presentacion: Optional[str] = None
+    registro_sanitario: Optional[str] = None
+    principio_activo: Optional[str] = None
+    forma_farmaceutica: Optional[str] = None
+    concentracion: Optional[str] = None
+    marca: Optional[str] = None
+    vida_util: Optional[str] = None
+    clasificacion_riesgo: Optional[str] = None
 
 class ProductOut(ProductCreate):
     id: int
+    empresa_id: Optional[int] = None
     created_at: datetime
+    
+    presentacion: Optional[str] = None
+    registro_sanitario: Optional[str] = None
+    principio_activo: Optional[str] = None
+    forma_farmaceutica: Optional[str] = None
+    concentracion: Optional[str] = None
+    marca: Optional[str] = None
+    vida_util: Optional[str] = None
+    clasificacion_riesgo: Optional[str] = None
 
     class Config:
         from_attributes = True
@@ -58,6 +104,12 @@ class LotCreate(BaseModel):
     product_id: int = Field(..., gt=0)
     lot_number: str = Field(..., min_length=1, max_length=100)
     barcode: Optional[str] = None
+    
+    factura: Optional[str] = None
+    fecha_recepcion: Optional[date] = None
+    estado_recepcion: Optional[str] = None
+    causas_rechazo: Optional[str] = None
+    
     expiry_date: date
     unit_cost: float = Field(0.0, ge=0)
     qty_initial: int = Field(..., gt=0, description="Debe ser mayor a 0")
@@ -70,6 +122,7 @@ class LotCreate(BaseModel):
 
 class LotOut(BaseModel):
     id: int
+    empresa_id: Optional[int] = None
     product_id: int
     lot_number: str
     barcode: Optional[str]
@@ -78,6 +131,11 @@ class LotOut(BaseModel):
     qty_initial: int
     qty_current: int
     created_at: datetime
+    
+    factura: Optional[str] = None
+    fecha_recepcion: Optional[date] = None
+    estado_recepcion: Optional[str] = None
+    causas_rechazo: Optional[str] = None
 
     class Config:
         from_attributes = True
@@ -89,14 +147,21 @@ class MovementCreate(BaseModel):
     lot_id: int = Field(..., gt=0)
     qty: int = Field(..., gt=0, description="Cantidad positiva. Para AJUSTE suma stock.")
     reason: Optional[str] = Field(None, max_length=500)
+    patient: Optional[str] = Field(None, max_length=200)
+    doctor: Optional[str] = Field(None, max_length=200)
+    destination: Optional[str] = Field(None, max_length=200)
 
 class MovementOut(BaseModel):
     id: int
     type: str
+    empresa_id: Optional[int] = None
     product_id: int
     lot_id: int
     qty: int
     reason: Optional[str]
+    patient: Optional[str] = None
+    doctor: Optional[str] = None
+    destination: Optional[str] = None
     user_email: str
     created_at: datetime
     product_name: Optional[str] = None

@@ -34,7 +34,7 @@ yarn-error.log*
 # ── Docker / Base de datos ─────────────────────
 pgdata/
 *.sql.backup
-docker-compose.override.yml
+# docker-compose.override.yml  <- descomentar si no quieres subir override local
 
 # ── macOS ──────────────────────────────────────
 .DS_Store
