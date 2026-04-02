@@ -53,12 +53,12 @@ ALLOWED_ORIGINS = os.getenv("ALLOWED_ORIGINS", "http://localhost:3000").split(",
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     logger.info("🚀 Iniciando servidor...")
-    Base.metadata.create_all(bind=engine)
-    _migrate_users_table()
-    _migrate_multitenant()       # <-- nueva migración multi-tenant
-    _migrate_new_fields()        # <-- migración para refactor Lote/Producto
-    _create_default_empresa()    # <-- crea Empresa 1 si no existe
-    _create_default_admin()
+    Base.metadata.create_all(bind=engine)   # Crear tablas si no existen
+    _create_default_empresa()               # Primero: empresa base
+    _create_default_admin()                 # Segundo: usuario SUPERADMIN
+    _migrate_users_table()                  # Tercero: migraciones de esquema (el UPDATE ya encontrará el user)
+    _migrate_multitenant()                  # Asignar empresa_id a registros huérfanos
+    _migrate_new_fields()                   # Columnas nuevas de productos/lotes/movimientos
     logger.info("✅ Servidor listo.")
     yield
     logger.info("🛑 Cerrando servidor.")
@@ -164,26 +164,32 @@ def _create_default_empresa():
 
 
 def _create_default_admin():
+    """Crea el SuperAdmin inicial. Credenciales configurables por variables de entorno."""
+    # Permite personalizar las credenciales en produccion (Render)
+    admin_email = os.getenv("SUPERADMIN_EMAIL", "admin@clinica.com")
+    admin_password = os.getenv("SUPERADMIN_PASSWORD", "admin123")
+    admin_name = os.getenv("SUPERADMIN_NAME", "Super Administrador")
+
     db = SessionLocal()
     try:
-        admin = db.query(User).filter(User.email == "admin@clinica.com").first()
+        admin = db.query(User).filter(User.email == admin_email).first()
         if not admin:
-            hashed = pwd_context.hash("admin123")
+            hashed = pwd_context.hash(admin_password)
             admin = User(
-                email="admin@clinica.com",
+                email=admin_email,
                 hashed_password=hashed,
-                full_name="Super Administrador",
+                full_name=admin_name,
                 role=UserRole.SUPERADMIN,
                 empresa_id=1,
             )
             db.add(admin)
             db.commit()
-            logger.info("✅ Super Admin creado (empresa_id=1).")
+            logger.info(f"✅ Super Admin creado: {admin_email} (empresa_id=1).")
         else:
-            # Promover a SUPERADMIN si era ADMIN
+            # Asegura que siempre sea SUPERADMIN aunque haya sido degradado
             if admin.role != UserRole.SUPERADMIN:
                 admin.role = UserRole.SUPERADMIN
-                admin.full_name = "Super Administrador"
+                logger.info(f"✅ {admin_email} promovido a SUPERADMIN.")
             if not admin.empresa_id:
                 admin.empresa_id = 1
             db.commit()
