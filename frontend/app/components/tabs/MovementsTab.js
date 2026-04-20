@@ -14,7 +14,7 @@ export default function MovementsTab() {
         <div>
             <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "1rem", flexWrap: "wrap", gap: "1rem" }}>
                 <input type="text" id="search-movements" placeholder="🔍 Buscar movimiento..." value={searchMovements} onChange={e => setSearchMovements(e.target.value)} className="input" style={{ flex: 1 }} />
-                <button id="btn-new-movement" onClick={() => setShowMovementForm(true)} className="btn-primary">+ Nuevo</button>
+                <button id="btn-new-movement" onClick={() => setShowMovementForm(true)} className="btn-primary">+ Nuevo Movimiento</button>
             </div>
             {loading ? (
                 <p style={{ textAlign: "center", padding: "2rem", color: "#6b7280" }}>Cargando...</p>

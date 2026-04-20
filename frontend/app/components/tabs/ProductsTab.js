@@ -30,7 +30,7 @@ export default function ProductsTab() {
                     <option value="OK">✓ OK</option>
                     <option value="BAJO">⚠️ Bajo</option>
                 </select>
-                <button id="btn-new-product" onClick={() => setShowProductForm(true)} className="btn-primary">+ Nuevo</button>
+                <button id="btn-new-product" onClick={() => setShowProductForm(true)} className="btn-primary">+ Nuevo Producto</button>
             </div>
             {loading ? (
                 <p style={{ textAlign: "center", padding: "2rem", color: "#6b7280" }}>Cargando...</p>

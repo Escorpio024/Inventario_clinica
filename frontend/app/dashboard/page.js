@@ -15,14 +15,14 @@ const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 const INITIAL_PRODUCT = {
     name: "", category: "Medicamento", unit: "unidad", min_stock: 2, barcode: "",
     presentacion: "", registro_sanitario: "", principio_activo: "",
-    forma_farmaceutica: "", concentracion: "", marca: "",
+    forma_farmaceutica: "", concentracion: "", marca: "", laboratorio: "",
     vida_util: "", clasificacion_riesgo: ""
 };
 
 const INITIAL_LOT = {
     product_id: "", lot_number: "", barcode: "", expiry_date: "",
-    unit_cost: 0, qty_initial: 1, factura: "", fecha_recepcion: "",
-    estado_recepcion: "Aceptado", causas_rechazo: ""
+    unit_cost: 0, qty_initial: 1, factura: "", proveedor: "",
+    fecha_recepcion: "", estado_recepcion: "Aceptado", causas_rechazo: ""
 };
 
 export default function Dashboard() {
@@ -353,6 +353,7 @@ export default function Dashboard() {
 
     async function saveLot(e) {
         e.preventDefault();
+        if (!newLot.product_id) return showMessage("Debes seleccionar un producto clínico de la lista", "danger");
         if (parseInt(newLot.qty_initial) <= 0) return showMessage("La cantidad debe ser mayor a 0", "danger");
         const method = editingLot ? "PUT" : "POST";
         const url = editingLot ? `${API}/lots/${editingLot.id}` : `${API}/lots`;
@@ -578,7 +579,7 @@ export default function Dashboard() {
 
     function showMessage(text, type) {
         setMessage({ text, type });
-        setTimeout(() => setMessage({ text: "", type: "" }), 5000);
+        setTimeout(() => setMessage({ text: "", type: "" }), 8000); // Dar más tiempo a los no técnicos para leer el error
     }
 
     // ── Cálculos de alertas ───────────────────────────────────────────────────
@@ -907,6 +908,17 @@ export default function Dashboard() {
                                         <input className="input" value={newProduct.registro_sanitario || ""} onChange={e => setNewProduct({ ...newProduct, registro_sanitario: e.target.value })} />
                                     </div>
                                 </div>
+                                {/* Marca y Laboratorio — aplica a todas las categorías */}
+                                <div style={{ display: "flex", gap: "1rem", marginBottom: "1rem" }}>
+                                    <div style={{ flex: 1 }}>
+                                        <label style={{ display: "block", marginBottom: "0.5rem", fontWeight: "500" }}>Marca Comercial</label>
+                                        <input className="input" placeholder="Ej: Tylenol, Neutrogena, BD" value={newProduct.marca || ""} onChange={e => setNewProduct({ ...newProduct, marca: e.target.value })} />
+                                    </div>
+                                    <div style={{ flex: 1 }}>
+                                        <label style={{ display: "block", marginBottom: "0.5rem", fontWeight: "500" }}>Laboratorio / Fabricante</label>
+                                        <input className="input" placeholder="Ej: Pfizer, Bayer, Genfar" value={newProduct.laboratorio || ""} onChange={e => setNewProduct({ ...newProduct, laboratorio: e.target.value })} />
+                                    </div>
+                                </div>
                                 {newProduct.category === "Medicamento" && (
                                     <>
                                         <div style={{ marginBottom: "1rem" }}>
@@ -929,10 +941,6 @@ export default function Dashboard() {
                                 {newProduct.category === "Cosmético" && (
                                     <>
                                         <div style={{ display: "flex", gap: "1rem", marginBottom: "1rem" }}>
-                                            <div style={{ flex: 1 }}>
-                                                <label style={{ display: "block", marginBottom: "0.5rem", fontWeight: "500" }}>Marca del Cosmético</label>
-                                                <input className="input" value={newProduct.marca || ""} onChange={e => setNewProduct({ ...newProduct, marca: e.target.value })} />
-                                            </div>
                                             <div style={{ flex: 1 }}>
                                                 <label style={{ display: "block", marginBottom: "0.5rem", fontWeight: "500" }}>Vida Útil</label>
                                                 <input className="input" value={newProduct.vida_util || ""} onChange={e => setNewProduct({ ...newProduct, vida_util: e.target.value })} placeholder="Ej: 12 meses" />
@@ -1008,6 +1016,10 @@ export default function Dashboard() {
                                 <div style={{ marginBottom: "1rem" }}>
                                     <label style={{ display: "block", marginBottom: "0.5rem", fontWeight: "500" }}>Factura Nº</label>
                                     <input className="input" value={newLot.factura} onChange={e => setNewLot({ ...newLot, factura: e.target.value })} />
+                                </div>
+                                <div style={{ marginBottom: "1rem" }}>
+                                    <label style={{ display: "block", marginBottom: "0.5rem", fontWeight: "500" }}>Nombre del Proveedor</label>
+                                    <input className="input" placeholder="Ej: Distribuidora Médica S.A." value={newLot.proveedor} onChange={e => setNewLot({ ...newLot, proveedor: e.target.value })} />
                                 </div>
                                 <div style={{ marginBottom: "1rem" }}>
                                     <label style={{ display: "block", marginBottom: "0.5rem", fontWeight: "500" }}>Fecha de Recepción (Compra)</label>

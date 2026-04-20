@@ -26,7 +26,7 @@ export default function LotsTab() {
                     <option value="WARNING">⚠️ Por vencer</option>
                     <option value="DANGER">🔴 Riesgo / Vencidos</option>
                 </select>
-                <button id="btn-new-lot" onClick={() => setShowLotForm(true)} className="btn-primary">+ Nuevo</button>
+                <button id="btn-new-lot" onClick={() => setShowLotForm(true)} className="btn-primary">+ Registrar Lote</button>
             </div>
             {loading ? (
                 <p style={{ textAlign: "center", padding: "2rem", color: "#6b7280" }}>Cargando...</p>
@@ -43,7 +43,7 @@ export default function LotsTab() {
                                 <th>F. Vencimiento</th>
                                 <th style={{ textAlign: "right" }}>Stock</th>
                                 <th>ℹ️ Recepción</th>
-                                <th style={{ textAlign: "right" }}>% Usado</th>
+                                <th style={{ textAlign: "right" }}>% Consumido</th>
                                 <th>Semaforización</th>
                                 <th>Acciones</th>
                             </tr></thead>
@@ -150,17 +150,62 @@ export default function LotsTab() {
                             {/* Section 1: Product Details */}
                             <div style={{ marginBottom: "2rem", background: "#f8fafc", padding: "1.25rem", borderRadius: "0.75rem", border: "1px solid #f1f5f9" }}>
                                 <h3 style={{ margin: "0 0 1.25rem 0", fontSize: "0.85rem", color: "#64748b", textTransform: "uppercase", letterSpacing: "1px", borderBottom: "1px solid #e2e8f0", paddingBottom: "0.5rem" }}>📦 Detalles del Producto</h3>
-
-                                <div style={{ display: "grid", gap: "1rem" }}>
-                                    <div style={{ display: "flex" }}><span style={{ minWidth: "140px", fontSize: "0.85rem", color: "#94a3b8" }}>Nombre</span><div style={{ fontWeight: "600", color: "#1e293b", fontSize: "0.95rem" }}>{p.name}</div></div>
-                                    <div style={{ display: "flex" }}><span style={{ minWidth: "140px", fontSize: "0.85rem", color: "#94a3b8" }}>Categoría</span><div style={{ color: "#334155", fontSize: "0.95rem" }}>{p.category}</div></div>
-
-                                    {(p.principio_activo || p.marca) && (
-                                        <div style={{ display: "flex" }}><span style={{ minWidth: "140px", fontSize: "0.85rem", color: "#94a3b8" }}>Activo / Marca</span><div style={{ color: "#334155", fontSize: "0.95rem" }}>{p.principio_activo || p.marca}</div></div>
+                                <div style={{ display: "grid", gap: "0.85rem" }}>
+                                    <div style={{ display: "flex" }}>
+                                        <span style={{ minWidth: "145px", fontSize: "0.85rem", color: "#94a3b8" }}>Nombre</span>
+                                        <div style={{ fontWeight: "700", color: "#1e293b", fontSize: "0.95rem" }}>{p.name || "—"}</div>
+                                    </div>
+                                    <div style={{ display: "flex", alignItems: "center" }}>
+                                        <span style={{ minWidth: "145px", fontSize: "0.85rem", color: "#94a3b8" }}>Categoría</span>
+                                        <span style={{ fontSize: "0.8rem", background: "#e0e7ff", color: "#4338ca", padding: "0.15rem 0.6rem", borderRadius: "999px", fontWeight: "600" }}>{p.category || "—"}</span>
+                                    </div>
+                                    <div style={{ borderTop: "1px dashed #e2e8f0", margin: "0.25rem 0" }} />
+                                    <div style={{ display: "flex" }}>
+                                        <span style={{ minWidth: "145px", fontSize: "0.85rem", color: "#94a3b8" }}>Marca Comercial</span>
+                                        <div style={{ color: "#334155", fontSize: "0.95rem" }}>{p.marca || <span style={{ color: "#cbd5e1" }}>—</span>}</div>
+                                    </div>
+                                    <div style={{ display: "flex" }}>
+                                        <span style={{ minWidth: "145px", fontSize: "0.85rem", color: "#94a3b8" }}>Laboratorio</span>
+                                        <div style={{ color: "#334155", fontSize: "0.95rem" }}>{p.laboratorio || <span style={{ color: "#cbd5e1" }}>—</span>}</div>
+                                    </div>
+                                    <div style={{ display: "flex" }}>
+                                        <span style={{ minWidth: "145px", fontSize: "0.85rem", color: "#94a3b8" }}>Presentación</span>
+                                        <div style={{ color: "#334155", fontSize: "0.95rem" }}>{p.presentacion || <span style={{ color: "#cbd5e1" }}>—</span>}</div>
+                                    </div>
+                                    <div style={{ display: "flex" }}>
+                                        <span style={{ minWidth: "145px", fontSize: "0.85rem", color: "#94a3b8" }}>Reg. Sanitario</span>
+                                        <div style={{ color: "#334155", fontSize: "0.95rem" }}>{p.registro_sanitario || <span style={{ color: "#cbd5e1" }}>—</span>}</div>
+                                    </div>
+                                    {p.principio_activo && (
+                                        <div style={{ display: "flex" }}>
+                                            <span style={{ minWidth: "145px", fontSize: "0.85rem", color: "#94a3b8" }}>Principio Activo</span>
+                                            <div style={{ color: "#334155", fontSize: "0.95rem" }}>{p.principio_activo}</div>
+                                        </div>
                                     )}
-
-                                    <div style={{ display: "flex" }}><span style={{ minWidth: "140px", fontSize: "0.85rem", color: "#94a3b8" }}>Reg. Sanitario</span><div style={{ color: "#334155", fontSize: "0.95rem" }}>{p.registro_sanitario || "No registrado"}</div></div>
-                                    <div style={{ display: "flex" }}><span style={{ minWidth: "140px", fontSize: "0.85rem", color: "#94a3b8" }}>Presentación</span><div style={{ color: "#334155", fontSize: "0.95rem" }}>{p.presentacion || "No registrada"}</div></div>
+                                    {p.forma_farmaceutica && (
+                                        <div style={{ display: "flex" }}>
+                                            <span style={{ minWidth: "145px", fontSize: "0.85rem", color: "#94a3b8" }}>Forma Farmacéutica</span>
+                                            <div style={{ color: "#334155", fontSize: "0.95rem" }}>{p.forma_farmaceutica}</div>
+                                        </div>
+                                    )}
+                                    {p.concentracion && (
+                                        <div style={{ display: "flex" }}>
+                                            <span style={{ minWidth: "145px", fontSize: "0.85rem", color: "#94a3b8" }}>Concentración</span>
+                                            <div style={{ color: "#334155", fontSize: "0.95rem" }}>{p.concentracion}</div>
+                                        </div>
+                                    )}
+                                    {p.clasificacion_riesgo && (
+                                        <div style={{ display: "flex" }}>
+                                            <span style={{ minWidth: "145px", fontSize: "0.85rem", color: "#94a3b8" }}>Clasificación Riesgo</span>
+                                            <div style={{ color: "#334155", fontSize: "0.95rem" }}>{p.clasificacion_riesgo}</div>
+                                        </div>
+                                    )}
+                                    {p.vida_util && (
+                                        <div style={{ display: "flex" }}>
+                                            <span style={{ minWidth: "145px", fontSize: "0.85rem", color: "#94a3b8" }}>Vida Útil</span>
+                                            <div style={{ color: "#334155", fontSize: "0.95rem" }}>{p.vida_util}</div>
+                                        </div>
+                                    )}
                                 </div>
                             </div>
 
@@ -172,6 +217,12 @@ export default function LotsTab() {
                                     <div style={{ display: "flex", justifyContent: "space-between" }}>
                                         <div style={{ flex: 1 }}><span style={{ fontSize: "0.85rem", color: "#94a3b8", display: "block", marginBottom: "0.25rem" }}>Lote / Serie</span><div style={{ fontFamily: "monospace", color: "#0284c7", fontWeight: "700", background: "#f0f9ff", padding: "0.25rem 0.5rem", borderRadius: "0.25rem", display: "inline-block" }}>{l.lot_number}</div></div>
                                         <div style={{ flex: 1 }}><span style={{ fontSize: "0.85rem", color: "#94a3b8", display: "block", marginBottom: "0.25rem" }}>Factura Nº</span><div style={{ fontWeight: "600", color: "#1e293b", fontSize: "0.95rem" }}>{l.factura || "—"}</div></div>
+                                    </div>
+
+                                    {/* Proveedor */}
+                                    <div style={{ display: "flex" }}>
+                                        <span style={{ minWidth: "140px", fontSize: "0.85rem", color: "#94a3b8" }}>Proveedor</span>
+                                        <div style={{ fontWeight: "600", color: "#1e293b", fontSize: "0.95rem" }}>{l.proveedor || <span style={{ color: "#cbd5e1" }}>— No registrado</span>}</div>
                                     </div>
 
                                     <div style={{ display: "flex", justifyContent: "space-between", gap: "1rem" }}>

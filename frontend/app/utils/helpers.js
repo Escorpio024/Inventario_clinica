@@ -1,7 +1,8 @@
 export function getLotExpiryStatus(expiryDate) {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
-    const expiry = new Date(expiryDate);
+    // Agregar T12:00:00 evita desplazamientos de un día por zona horaria
+    const expiry = new Date(expiryDate + "T12:00:00");
     const daysUntilExpiry = Math.floor((expiry - today) / (1000 * 60 * 60 * 24));
 
     if (daysUntilExpiry < 0) return {

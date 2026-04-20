@@ -116,10 +116,11 @@ def _migrate_new_fields():
         "presentacion VARCHAR", "registro_sanitario VARCHAR",
         "principio_activo VARCHAR", "forma_farmaceutica VARCHAR",
         "concentracion VARCHAR", "marca VARCHAR",
-        "vida_util VARCHAR", "clasificacion_riesgo VARCHAR"
+        "laboratorio VARCHAR", "vida_util VARCHAR", "clasificacion_riesgo VARCHAR"
     ]
     lot_cols = [
-        "factura VARCHAR", "fecha_recepcion DATE",
+        "factura VARCHAR", "proveedor VARCHAR",
+        "fecha_recepcion DATE",
         "estado_recepcion VARCHAR", "causas_rechazo VARCHAR"
     ]
     mov_cols = [
@@ -658,6 +659,7 @@ def update_lot(
     lot.expiry_date = payload.expiry_date
     lot.unit_cost = payload.unit_cost
     lot.factura = payload.factura
+    lot.proveedor = payload.proveedor
     lot.fecha_recepcion = payload.fecha_recepcion
     lot.estado_recepcion = payload.estado_recepcion
     lot.causas_rechazo = payload.causas_rechazo
@@ -792,14 +794,69 @@ def report_inventory_lots(
     eid: int = Depends(get_empresa_id)
 ):
     try:
-        from openpyxl.styles import Font, PatternFill, Alignment
+        from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
+        from datetime import date as date_type
 
         wb = Workbook()
+        today_str = datetime.now().strftime("%d/%m/%Y %H:%M")
 
-        # ── Hoja 1: Inventario por lote ──
+        # ─ Estilos comunes ─────────────────────────────────────────────────────
+        header_fill   = PatternFill(start_color="667EEA", end_color="667EEA", fill_type="solid")
+        header_font   = Font(bold=True, color="FFFFFF", size=11)
+        title_font    = Font(bold=True, color="1E293B", size=13)
+        warn_fill     = PatternFill(start_color="FEF3C7", end_color="FEF3C7", fill_type="solid")
+        danger_fill   = PatternFill(start_color="FEE2E2", end_color="FEE2E2", fill_type="solid")
+        ok_fill       = PatternFill(start_color="D1FAE5", end_color="D1FAE5", fill_type="solid")
+        center        = Alignment(horizontal="center", vertical="center", wrap_text=True)
+        left          = Alignment(horizontal="left",   vertical="center", wrap_text=True)
+        thin_border   = Border(
+            bottom=Side(style="thin", color="E2E8F0"),
+            right=Side(style="thin", color="E2E8F0")
+        )
+
+        def style_sheet(ws, headers):
+            """Aplica estilo de encabezado y autoajuste a una hoja."""
+            ws.row_dimensions[1].height = 30
+            ws.freeze_panes = "A2"
+            for i, h in enumerate(headers, 1):
+                cell = ws.cell(row=1, column=i, value=h)
+                cell.fill = header_fill
+                cell.font = header_font
+                cell.alignment = center
+            for col in ws.columns:
+                max_len = max((len(str(c.value or "")) for c in col), default=8)
+                ws.column_dimensions[col[0].column_letter].width = min(max_len + 4, 45)
+
+        def fmt_date(d):
+            if d is None:
+                return ""
+            if isinstance(d, str):
+                return d
+            return d.strftime("%d/%m/%Y")
+
+        def days_to_expiry(expiry):
+            if not expiry:
+                return None
+            today = date_type.today()
+            return (expiry - today).days
+
+        # ══════════════════════════════════════════════════════════════════════
+        # HOJA 1: Inventario de Lotes (completo)
+        # ══════════════════════════════════════════════════════════════════════
         ws1 = wb.active
-        ws1.title = "Inventario por Lote"
-        ws1.append(["Producto", "Categoría", "Unidad", "Lote", "Vencimiento", "Cantidad actual", "Stock mínimo", "Código"])
+        ws1.title = "Inventario Lotes"
+
+        headers1 = [
+            "Producto", "Categoría", "Marca Comercial", "Laboratorio",
+            "Principio Activo", "Forma Farmacéutica", "Concentración",
+            "Presentación", "Reg. Sanitario", "Unidad",
+            "Nº Lote", "Factura", "Proveedor",
+            "F. Recepción", "F. Vencimiento", "Días p/Vencer",
+            "Stock Inicial", "Stock Actual", "% Consumido",
+            "Costo Unitario", "Valor Lote",
+            "Estado Recepción", "Causas Rechazo", "Semaforización"
+        ]
+
         lots = (
             db.query(Lot, Product)
             .join(Product, Product.id == Lot.product_id)
@@ -807,17 +864,119 @@ def report_inventory_lots(
             .order_by(Lot.expiry_date.asc())
             .all()
         )
-        for lot, product in lots:
-            exp_str = lot.expiry_date.strftime("%Y-%m-%d") if lot.expiry_date else "Sin fecha"
-            ws1.append([
-                product.name or "", product.category or "", product.unit or "",
-                lot.lot_number or "", exp_str, lot.qty_current or 0,
-                product.min_stock or 0, lot.barcode or "",
-            ])
 
-        # ── Hoja 2: Movimientos (trazabilidad) ──
-        ws2 = wb.create_sheet("Movimientos")
-        ws2.append(["ID", "Tipo", "Producto", "Lote", "Cantidad", "Usuario", "Fecha", "Razón"])
+        style_sheet(ws1, headers1)
+
+        for row_idx, (lot, product) in enumerate(lots, start=2):
+            days = days_to_expiry(lot.expiry_date)
+            if days is None:
+                semaforo = "Sin fecha"
+            elif days < 0:
+                semaforo = "🔴 VENCIDO"
+            elif days <= 90:
+                semaforo = f"🔴 Riesgo ({days}d)"
+            elif days <= 365:
+                semaforo = f"⏳ Por vencer ({days}d)"
+            else:
+                semaforo = f"✓ OK ({days}d)"
+
+            pct = round(((lot.qty_initial - lot.qty_current) / lot.qty_initial) * 100) if lot.qty_initial > 0 else 0
+            valor = (lot.qty_current or 0) * (lot.unit_cost or 0)
+
+            row_data = [
+                product.name or "",
+                product.category or "",
+                product.marca or "",
+                getattr(product, "laboratorio", "") or "",
+                product.principio_activo or "",
+                product.forma_farmaceutica or "",
+                product.concentracion or "",
+                product.presentacion or "",
+                product.registro_sanitario or "",
+                product.unit or "",
+                lot.lot_number or "",
+                lot.factura or "",
+                getattr(lot, "proveedor", "") or "",
+                fmt_date(lot.fecha_recepcion),
+                fmt_date(lot.expiry_date),
+                days if days is not None else "",
+                lot.qty_initial or 0,
+                lot.qty_current or 0,
+                f"{pct}%",
+                lot.unit_cost or 0,
+                round(valor, 2),
+                lot.estado_recepcion or "Aceptado",
+                lot.causas_rechazo or "",
+                semaforo,
+            ]
+
+            for col_idx, value in enumerate(row_data, start=1):
+                cell = ws1.cell(row=row_idx, column=col_idx, value=value)
+                cell.alignment = left
+                cell.border = thin_border
+
+            # Color de fila según semaforización
+            if days is not None and days < 0:
+                fill = danger_fill
+            elif days is not None and days <= 90:
+                fill = danger_fill
+            elif days is not None and days <= 365:
+                fill = warn_fill
+            else:
+                fill = ok_fill
+
+            for col_idx in range(1, len(headers1) + 1):
+                ws1.cell(row=row_idx, column=col_idx).fill = fill
+
+        # ══════════════════════════════════════════════════════════════════════
+        # HOJA 2: Catálogo de Productos
+        # ══════════════════════════════════════════════════════════════════════
+        ws2 = wb.create_sheet("Catálogo Productos")
+        headers2 = [
+            "Nombre", "Categoría", "Marca Comercial", "Laboratorio",
+            "Principio Activo", "Forma Farmacéutica", "Concentración",
+            "Presentación", "Reg. Sanitario", "Clasificación Riesgo",
+            "Vida Útil", "Unidad", "Stock Mínimo", "Stock Actual"
+        ]
+        style_sheet(ws2, headers2)
+
+        products_q = db.query(Product).filter(Product.empresa_id == eid).order_by(Product.category, Product.name).all()
+        lot_stock_map = {}
+        for lot, product in lots:
+            lot_stock_map[product.id] = lot_stock_map.get(product.id, 0) + (lot.qty_current or 0)
+
+        for row_idx, p in enumerate(products_q, start=2):
+            stock_actual = lot_stock_map.get(p.id, 0)
+            row_data = [
+                p.name or "", p.category or "",
+                p.marca or "",
+                getattr(p, "laboratorio", "") or "",
+                p.principio_activo or "", p.forma_farmaceutica or "",
+                p.concentracion or "", p.presentacion or "",
+                p.registro_sanitario or "", p.clasificacion_riesgo or "",
+                p.vida_util or "", p.unit or "",
+                p.min_stock or 0, stock_actual,
+            ]
+            is_low = stock_actual < (p.min_stock or 0)
+            for col_idx, value in enumerate(row_data, start=1):
+                cell = ws2.cell(row=row_idx, column=col_idx, value=value)
+                cell.alignment = left
+                cell.border = thin_border
+                if is_low and col_idx == 14:
+                    cell.fill = danger_fill
+                    cell.font = Font(bold=True, color="DC2626")
+
+        # ══════════════════════════════════════════════════════════════════════
+        # HOJA 3: Movimientos (trazabilidad completa)
+        # ══════════════════════════════════════════════════════════════════════
+        ws3 = wb.create_sheet("Movimientos")
+        headers3 = [
+            "ID", "Fecha", "Tipo", "Producto", "Categoría",
+            "Nº Lote", "Cantidad", "Paciente", "Médico", "Destino",
+            "Razón / Nota", "Usuario"
+        ]
+        style_sheet(ws3, headers3)
+
         movements = (
             db.query(Movement)
             .options(joinedload(Movement.product), joinedload(Movement.lot))
@@ -825,42 +984,51 @@ def report_inventory_lots(
             .order_by(Movement.created_at.desc())
             .all()
         )
-        for m in movements:
-            ws2.append([
+        type_colors = {
+            "ENTRADA": "D1FAE5", "SALIDA": "FEE2E2",
+            "MERMA": "FEF3C7", "AJUSTE": "EDE9FE"
+        }
+        for row_idx, m in enumerate(movements, start=2):
+            mov_type = m.type.value if hasattr(m.type, "value") else str(m.type)
+            row_data = [
                 m.id,
-                m.type.value,
+                m.created_at.strftime("%d/%m/%Y %H:%M") if m.created_at else "",
+                mov_type,
                 m.product.name if m.product else "",
+                m.product.category if m.product else "",
                 m.lot.lot_number if m.lot else "",
                 m.qty,
-                m.user_email,
-                m.created_at.strftime("%Y-%m-%d %H:%M") if m.created_at else "",
+                m.patient or "",
+                m.doctor or "",
+                m.destination or "",
                 m.reason or "",
-            ])
+                m.user_email or "",
+            ]
+            row_fill = PatternFill(start_color=type_colors.get(mov_type, "F8FAFC"),
+                                   end_color=type_colors.get(mov_type, "F8FAFC"),
+                                   fill_type="solid")
+            for col_idx, value in enumerate(row_data, start=1):
+                cell = ws3.cell(row=row_idx, column=col_idx, value=value)
+                cell.alignment = left
+                cell.border = thin_border
+                cell.fill = row_fill
 
-        # ── Estilos headers ──
-        header_fill = PatternFill(start_color="667EEA", end_color="667EEA", fill_type="solid")
-        header_font = Font(bold=True, color="FFFFFF")
-        for ws in [ws1, ws2]:
-            for cell in ws[1]:
-                cell.fill = header_fill
-                cell.font = header_font
-                cell.alignment = Alignment(horizontal="center")
-            for col in ws.columns:
-                max_len = max((len(str(cell.value or "")) for cell in col), default=10)
-                ws.column_dimensions[col[0].column_letter].width = min(max_len + 4, 40)
-
+        # ── Guardar y devolver ──────────────────────────────────────────────
         buffer = BytesIO()
         wb.save(buffer)
         buffer.seek(0)
 
-        logger.info(f"📊 Excel generado por {u.email}")
+        filename = f"inventario_clinica_{datetime.now().strftime('%Y%m%d_%H%M')}.xlsx"
+        logger.info(f"📊 Excel ({len(lots)} lotes, {len(movements)} movs) generado por {u.email}")
         return StreamingResponse(
             buffer,
             media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-            headers={"Content-Disposition": "attachment; filename=inventario_clinica.xlsx"},
+            headers={"Content-Disposition": f"attachment; filename={filename}"},
         )
     except Exception as e:
+        logger.error(f"❌ Error generando Excel: {e}")
         raise HTTPException(status_code=500, detail=f"Error generando reporte: {str(e)}")
+
 
 # ── Email Alerts ──────────────────────────────────────────────────────────────
 @app.post("/reports/email-alerts", tags=["reports"])

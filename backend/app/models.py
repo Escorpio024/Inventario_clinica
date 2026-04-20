@@ -56,8 +56,9 @@ class Product(Base):
     forma_farmaceutica = Column(String, nullable=True)
     concentracion = Column(String, nullable=True)
     
-    # Específicos COSMÉTICOS (/ Disp. Médicos)
-    marca = Column(String, nullable=True)
+    # Marca y fabricante (aplica a todas las categorías)
+    marca = Column(String, nullable=True)          # Marca comercial
+    laboratorio = Column(String, nullable=True)    # Laboratorio / Fabricante
     vida_util = Column(String, nullable=True)
     
     # Específicos DISPOSITIVOS MÉDICOS
@@ -79,6 +80,7 @@ class Lot(Base):
     
     # --- Nuevos campos (Transaccionales) ---
     factura = Column(String, nullable=True)
+    proveedor = Column(String, nullable=True)      # Nombre del proveedor
     fecha_recepcion = Column(Date, nullable=True)
     estado_recepcion = Column(String, nullable=True) # Aceptado / Rechazado
     causas_rechazo = Column(String, nullable=True)

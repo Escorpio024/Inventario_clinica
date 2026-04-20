@@ -79,6 +79,7 @@ class ProductCreate(BaseModel):
     forma_farmaceutica: Optional[str] = None
     concentracion: Optional[str] = None
     marca: Optional[str] = None
+    laboratorio: Optional[str] = None
     vida_util: Optional[str] = None
     clasificacion_riesgo: Optional[str] = None
 
@@ -93,6 +94,7 @@ class ProductOut(ProductCreate):
     forma_farmaceutica: Optional[str] = None
     concentracion: Optional[str] = None
     marca: Optional[str] = None
+    laboratorio: Optional[str] = None
     vida_util: Optional[str] = None
     clasificacion_riesgo: Optional[str] = None
 
@@ -106,6 +108,7 @@ class LotCreate(BaseModel):
     barcode: Optional[str] = None
     
     factura: Optional[str] = None
+    proveedor: Optional[str] = None
     fecha_recepcion: Optional[date] = None
     estado_recepcion: Optional[str] = None
     causas_rechazo: Optional[str] = None
@@ -133,6 +136,7 @@ class LotOut(BaseModel):
     created_at: datetime
     
     factura: Optional[str] = None
+    proveedor: Optional[str] = None
     fecha_recepcion: Optional[date] = None
     estado_recepcion: Optional[str] = None
     causas_rechazo: Optional[str] = None
