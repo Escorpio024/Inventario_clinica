@@ -550,7 +550,7 @@ def delete_product(
     user: User = Depends(get_current_user),
     eid: int = Depends(get_empresa_id)
 ):
-    if user.role != UserRole.ADMIN:
+    if user.role not in (UserRole.ADMIN, UserRole.SUPERADMIN):
         raise HTTPException(403, "Solo los administradores pueden eliminar productos")
     product = db.query(Product).filter(Product.id == id, Product.empresa_id == eid).first()
     if not product:
@@ -583,9 +583,11 @@ def get_lots(
             Lot.lot_number.ilike(f"%{search}%") |
             Lot.barcode.ilike(f"%{search}%") |
             Lot.factura.ilike(f"%{search}%") |
+            Lot.proveedor.ilike(f"%{search}%") |
             Product.category.ilike(f"%{search}%") |
             Product.principio_activo.ilike(f"%{search}%") |
-            Product.marca.ilike(f"%{search}%")
+            Product.marca.ilike(f"%{search}%") |
+            Product.laboratorio.ilike(f"%{search}%")
         )
     if status_filter == "DANGER":
         query = query.filter(Lot.expiry_date <= date.today() + timedelta(days=90))
@@ -631,7 +633,7 @@ def delete_lot(
     user: User = Depends(get_current_user),
     eid: int = Depends(get_empresa_id)
 ):
-    if user.role != UserRole.ADMIN:
+    if user.role not in (UserRole.ADMIN, UserRole.SUPERADMIN):
         raise HTTPException(403, "Solo los administradores pueden eliminar lotes")
     lot = db.query(Lot).filter(Lot.id == id, Lot.empresa_id == eid).first()
     if not lot:

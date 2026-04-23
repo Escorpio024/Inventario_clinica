@@ -19,7 +19,7 @@ export default function LotsTab() {
     return (
         <div>
             <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "1rem", flexWrap: "wrap", gap: "1rem" }}>
-                <input type="text" id="search-lots" placeholder="🔍 Buscar por producto, Nº lote, factura, marca, principio activo..." value={searchLots} onChange={e => setSearchLots(e.target.value)} className="input" style={{ flex: 1, minWidth: "200px" }} />
+                <input type="text" id="search-lots" placeholder="🔍 Buscar por producto, lote, factura, proveedor, marca, laboratorio..." value={searchLots} onChange={e => setSearchLots(e.target.value)} className="input" style={{ flex: 1, minWidth: "200px" }} />
                 <select id="filter-status" value={filterStatus} onChange={e => setFilterStatus(e.target.value)} className="input" style={{ width: "160px" }}>
                     <option value="">Todos</option>
                     <option value="OK">✓ OK</option>
