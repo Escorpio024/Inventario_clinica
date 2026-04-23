@@ -11,12 +11,35 @@ export default function LoginPage() {
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState("");
     const [mounted, setMounted] = useState(false);
+    const [serverStatus, setServerStatus] = useState("checking"); // checking | ready | slow
 
     useEffect(() => {
         setMounted(true);
         if (localStorage.getItem("token")) {
             router.replace("/dashboard");
+            return;
         }
+        // Wake-up ping: despierta el backend de Render al cargar la página
+        const startTime = Date.now();
+        const pingTimeout = setTimeout(() => setServerStatus("slow"), 4000); // si tarda >4s avisa
+        fetch(`${API}/health`, { method: "GET" })
+            .then(r => {
+                clearTimeout(pingTimeout);
+                if (r.ok) {
+                    const elapsed = Date.now() - startTime;
+                    // Si tardo más de 3 segundos fue un cold start, mostrar brevemente "listo"
+                    if (elapsed > 3000) {
+                        setServerStatus("ready");
+                        setTimeout(() => setServerStatus("hidden"), 3000);
+                    } else {
+                        setServerStatus("hidden");
+                    }
+                }
+            })
+            .catch(() => {
+                clearTimeout(pingTimeout);
+                setServerStatus("hidden"); // no bloquear el login si el ping falla
+            });
     }, [router]);
 
     async function handleLogin(e) {
@@ -123,6 +146,35 @@ export default function LoginPage() {
                         Ingresa a tu cuenta para acceder al inventario
                     </p>
                 </div>
+
+                {/* Banner de estado del servidor */}
+                {serverStatus === "slow" && (
+                    <div style={{
+                        marginBottom: "1.25rem",
+                        padding: "0.875rem 1rem",
+                        background: "#fffbeb",
+                        border: "1px solid #fcd34d",
+                        borderRadius: "0.75rem",
+                        display: "flex", alignItems: "center", gap: "0.75rem",
+                        fontSize: "0.85rem", color: "#92400e"
+                    }}>
+                        <span style={{ fontSize: "1.2rem", animation: "spin 1.5s linear infinite", display: "inline-block" }}>⚙️</span>
+                        <span><b>Despertando el servidor</b> — El sistema estuvo inactivo. Espera unos segundos mientras arranca...</span>
+                    </div>
+                )}
+                {serverStatus === "ready" && (
+                    <div style={{
+                        marginBottom: "1.25rem",
+                        padding: "0.875rem 1rem",
+                        background: "#f0fdf4",
+                        border: "1px solid #86efac",
+                        borderRadius: "0.75rem",
+                        display: "flex", alignItems: "center", gap: "0.75rem",
+                        fontSize: "0.85rem", color: "#166534"
+                    }}>
+                        <span>✅</span> <span><b>¡Servidor listo!</b> Puedes iniciar sesión ahora.</span>
+                    </div>
+                )}
 
                 <form onSubmit={handleLogin} style={{ display: "flex", flexDirection: "column", gap: "1.25rem" }}>
                     {error && (
