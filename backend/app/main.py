@@ -20,7 +20,10 @@ from .schemas import (
     EmpresaCreate, EmpresaOut, SaaSRegister
 )
 
-# ── Logging ───────────────────────────────────────────────────────────────────
+# ── Logging & Warnings ────────────────────────────────────────────────────────
+import warnings
+warnings.filterwarnings("ignore", category=UserWarning, module="passlib")
+
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
