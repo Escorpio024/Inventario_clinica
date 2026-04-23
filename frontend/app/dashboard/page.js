@@ -1079,7 +1079,8 @@ export default function Dashboard() {
                         <div className="card" style={{ maxWidth: "500px", width: "100%", animation: "slideUp 0.3s ease-out", maxHeight: "90vh", overflowY: "auto" }} onClick={e => e.stopPropagation()}>
                             <h2 style={{ marginBottom: "1.5rem" }}>Registrar Movimiento</h2>
                             <form onSubmit={createMovement}>
-                                <div style={{ marginBottom: "1rem" }}>
+                                {/* Escáner oculto a petición del usuario, no eliminar */}
+                                <div style={{ marginBottom: "1rem", display: "none" }}>
                                     <button type="button" className="btn-secondary" onClick={() => { setScannerContext("movement"); setShowScanner(true); }} style={{ width: "100%" }}>
                                         📷 Escanear QR/Código
                                     </button>
