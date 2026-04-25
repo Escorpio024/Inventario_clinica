@@ -11,7 +11,8 @@ export default function LotsTab() {
         visibleRows, setVisibleRows,
         loading,
         setShowLotForm,
-        setEditingLot, setNewLot
+        setEditingLot, setNewLot,
+        deleteLot, isSuperAdmin
     } = useDashboard();
 
     const [selectedLotForDrawer, setSelectedLotForDrawer] = useState(null);
@@ -102,6 +103,9 @@ export default function LotsTab() {
                                             </td>
                                             <td style={{ display: "flex", gap: "0.4rem" }}>
                                                 <button onClick={(e) => { e.stopPropagation(); setSelectedLotForDrawer(l); }} style={{ background: "#f3f4f6", color: "#4b5563", border: "none", borderRadius: "0.5rem", padding: "0.375rem 0.625rem", cursor: "pointer", fontSize: "0.875rem", fontWeight: "700", display: "flex", alignItems: "center", gap: "0.2rem" }}>👁️ Ver</button>
+                                                {isSuperAdmin && (
+                                                    <button onClick={(e) => { e.stopPropagation(); deleteLot(l.id); }} title="Eliminar lote" style={{ background: "#fee2e2", color: "#dc2626", border: "none", borderRadius: "0.5rem", padding: "0.375rem 0.625rem", cursor: "pointer", fontSize: "0.875rem", fontWeight: "700", display: "flex", alignItems: "center", gap: "0.2rem", transition: "all 0.2s" }}>🗑️</button>
+                                                )}
                                             </td>
                                         </tr>
                                     );
