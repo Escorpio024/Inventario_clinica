@@ -217,7 +217,7 @@ app.add_middleware(
 )
 
 # ── Health Check (para UptimeRobot — evita Cold Start en Render) ─────────────
-@app.get("/health", tags=["system"], include_in_schema=False)
+@app.api_route("/health", methods=["GET", "HEAD"], tags=["system"], include_in_schema=False)
 def health_check():
     """Endpoint ultraligero para mantener el servidor de Render activo.
     Configura UptimeRobot para hacer ping aquí cada 5 minutos."""
