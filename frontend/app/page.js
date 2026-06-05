@@ -2,7 +2,7 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 
-const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+const API = process.env.NEXT_PUBLIC_API_URL || "";
 
 export default function LoginPage() {
     const router = useRouter();
@@ -11,41 +11,67 @@ export default function LoginPage() {
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState("");
     const [mounted, setMounted] = useState(false);
-    const [serverStatus, setServerStatus] = useState("checking"); // checking | ready | slow
+    const [serverStatus, setServerStatus] = useState("hidden"); // hidden | slow | ready
 
     useEffect(() => {
-        setMounted(true);
-        if (localStorage.getItem("token")) {
-            router.replace("/dashboard");
-            return;
-        }
-        // Wake-up ping: despierta el backend de Render al cargar la página
-        const startTime = Date.now();
-        const pingTimeout = setTimeout(() => setServerStatus("slow"), 4000); // si tarda >4s avisa
-        fetch(`${API}/health`, { method: "GET" })
-            .then(r => {
-                clearTimeout(pingTimeout);
-                if (r.ok) {
-                    const elapsed = Date.now() - startTime;
-                    // Si tardo más de 3 segundos fue un cold start, mostrar brevemente "listo"
-                    if (elapsed > 3000) {
-                        setServerStatus("ready");
-                        setTimeout(() => setServerStatus("hidden"), 3000);
+        let cancelled = false;
+        let pingTimeout = null;
+
+        try {
+            setMounted(true);
+            if (localStorage.getItem("token")) {
+                router.replace("/dashboard");
+                return;
+            }
+            // Solo hacer ping si hay una URL de API configurada
+            if (!API) return;
+
+            const startTime = Date.now();
+            pingTimeout = setTimeout(() => {
+                if (!cancelled) setServerStatus("slow");
+            }, 4000);
+
+            fetch(`${API}/health`, { method: "GET", signal: AbortSignal.timeout(15000) })
+                .then(r => {
+                    if (cancelled) return;
+                    clearTimeout(pingTimeout);
+                    if (r.ok) {
+                        const elapsed = Date.now() - startTime;
+                        if (elapsed > 3000) {
+                            setServerStatus("ready");
+                            setTimeout(() => { if (!cancelled) setServerStatus("hidden"); }, 3000);
+                        } else {
+                            setServerStatus("hidden");
+                        }
                     } else {
                         setServerStatus("hidden");
                     }
-                }
-            })
-            .catch(() => {
-                clearTimeout(pingTimeout);
-                setServerStatus("hidden"); // no bloquear el login si el ping falla
-            });
+                })
+                .catch(() => {
+                    if (!cancelled) {
+                        clearTimeout(pingTimeout);
+                        setServerStatus("hidden");
+                    }
+                });
+        } catch {
+            setServerStatus("hidden");
+        }
+
+        return () => {
+            cancelled = true;
+            if (pingTimeout) clearTimeout(pingTimeout);
+        };
     }, [router]);
 
     async function handleLogin(e) {
         e.preventDefault();
         setLoading(true);
         setError("");
+        if (!API) {
+            setError("El servidor no está configurado. Contacta al administrador del sistema.");
+            setLoading(false);
+            return;
+        }
         try {
             const res = await fetch(`${API}/auth/login`, {
                 method: "POST",
@@ -65,7 +91,7 @@ export default function LoginPage() {
                 setError(err.detail || "Credenciales incorrectas. Intenta de nuevo.");
             }
         } catch {
-            setError("No se pudo conectar al servidor. Verifica tu conexión.");
+            setError("No se pudo conectar al servidor. El servicio puede estar temporalmente fuera de línea.");
         } finally {
             setLoading(false);
         }
