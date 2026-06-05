@@ -360,6 +360,7 @@ export default function Dashboard() {
         if (!force) {
             const exists = lots.some(l => 
                 l.product_id == newLot.product_id && 
+                l.lot_number && newLot.lot_number &&
                 l.lot_number.toLowerCase() === newLot.lot_number.toLowerCase() &&
                 (!editingLot || l.id !== editingLot.id)
             );
