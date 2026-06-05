@@ -617,10 +617,11 @@ def create_lot(
     existing = db.query(Lot).filter(
         Lot.product_id == lot.product_id,
         Lot.lot_number == lot.lot_number,
+        Lot.factura == lot.factura,
         Lot.empresa_id == eid
     ).first()
     if existing:
-        raise HTTPException(400, f"Ya existe el lote '{lot.lot_number}' para este producto")
+        raise HTTPException(400, f"Ya existe el lote '{lot.lot_number}' con la factura '{lot.factura}' para este producto")
 
     db_lot = Lot(**lot.dict(), qty_current=lot.qty_initial, empresa_id=eid)
     db.add(db_lot)
