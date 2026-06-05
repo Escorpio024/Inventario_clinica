@@ -351,10 +351,30 @@ export default function Dashboard() {
         }
     }
 
-    async function saveLot(e) {
-        e.preventDefault();
+    async function saveLot(e, force = false) {
+        if (e) e.preventDefault();
         if (!newLot.product_id) return showMessage("Debes seleccionar un producto clínico de la lista", "danger");
         if (parseInt(newLot.qty_initial) <= 0) return showMessage("La cantidad debe ser mayor a 0", "danger");
+
+        // Check for duplicate lot number before saving
+        if (!force) {
+            const exists = lots.some(l => 
+                l.product_id == newLot.product_id && 
+                l.lot_number.toLowerCase() === newLot.lot_number.toLowerCase() &&
+                (!editingLot || l.id !== editingLot.id)
+            );
+
+            if (exists) {
+                setConfirmModal({
+                    show: true,
+                    message: `Ya existe un lote registrado con el número '${newLot.lot_number}' para este producto. ¿Deseas guardarlo de todas formas (por ejemplo, porque pertenece a otra factura)?`,
+                    danger: false,
+                    onConfirm: () => saveLot(null, true)
+                });
+                return;
+            }
+        }
+
         const method = editingLot ? "PUT" : "POST";
         const url = editingLot ? `${API}/lots/${editingLot.id}` : `${API}/lots`;
 
