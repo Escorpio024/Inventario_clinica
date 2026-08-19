@@ -599,7 +599,8 @@ export default function Dashboard() {
     }
 
     function showMessage(text, type) {
-        setMessage({ text, type });
+        let safeText = typeof text === "string" ? text : (Array.isArray(text) ? "Error de validación: Revisa los datos ingresados." : JSON.stringify(text));
+        setMessage({ text: safeText, type });
         setTimeout(() => setMessage({ text: "", type: "" }), 8000); // Dar más tiempo a los no técnicos para leer el error
     }
 
