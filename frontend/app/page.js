@@ -88,7 +88,11 @@ export default function LoginPage() {
                 router.replace("/dashboard");
             } else {
                 const err = await res.json().catch(() => ({}));
-                setError(err.detail || "Credenciales incorrectas. Intenta de nuevo.");
+                const detail = err.detail;
+                const msg = Array.isArray(detail)
+                    ? "Credenciales incorrectas. Intenta de nuevo."
+                    : (typeof detail === "string" ? detail : "Credenciales incorrectas. Intenta de nuevo.");
+                setError(msg);
             }
         } catch {
             setError("No se pudo conectar al servidor. El servicio puede estar temporalmente fuera de línea.");
