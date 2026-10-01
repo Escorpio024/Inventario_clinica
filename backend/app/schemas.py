@@ -123,6 +123,21 @@ class LotCreate(BaseModel):
             raise ValueError("La fecha de vencimiento no puede ser en el pasado")
         return v
 
+class LotUpdate(BaseModel):
+    product_id: int = Field(..., gt=0)
+    lot_number: str = Field(..., min_length=1, max_length=100)
+    barcode: Optional[str] = None
+
+    factura: Optional[str] = None
+    proveedor: Optional[str] = None
+    fecha_recepcion: Optional[date] = None
+    estado_recepcion: Optional[str] = None
+    causas_rechazo: Optional[str] = None
+
+    expiry_date: date
+    unit_cost: float = Field(0.0, ge=0)
+    qty_initial: int = Field(..., gt=0, description="Debe ser mayor a 0")
+
 class LotOut(BaseModel):
     id: int
     empresa_id: Optional[int] = None

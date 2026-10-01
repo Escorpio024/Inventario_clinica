@@ -16,7 +16,7 @@ import logging
 from .models import Base, User, Product, Lot, Movement, MovementType, UserRole, Empresa
 from .schemas import (
     UserLogin, Token, UserCreate, UserUpdate, UserOut,
-    ProductCreate, ProductOut, LotCreate, LotOut, MovementCreate, MovementOut,
+    ProductCreate, ProductOut, LotCreate, LotUpdate, LotOut, MovementCreate, MovementOut,
     EmpresaCreate, EmpresaOut, SaaSRegister
 )
 
@@ -254,8 +254,15 @@ def get_current_user(
     return user
 
 def get_empresa_id(user: User = Depends(get_current_user)) -> int:
-    """Retorna el empresa_id del usuario autenticado (con fallback a 1)."""
-    return user.empresa_id or 1
+    """Retorna el empresa_id del usuario autenticado (con fallback a 1 solo para SUPERADMIN)."""
+    if user.empresa_id is None:
+        if user.role != UserRole.SUPERADMIN:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Usuario sin empresa asignada."
+            )
+        return 1
+    return user.empresa_id
 
 def require_admin(user: User = Depends(get_current_user)) -> User:
     """Requiere ADMIN o SUPERADMIN."""
@@ -546,6 +553,24 @@ def create_product(
     logger.info(f"📦 Producto '{product.name}' creado por {user.email} (empresa {eid})")
     return db_product
 
+@app.put("/products/{id}", response_model=ProductOut, tags=["products"])
+def update_product(
+    id: int,
+    payload: ProductCreate,
+    db: Session = Depends(get_db),
+    user: User = Depends(require_admin),
+    eid: int = Depends(get_empresa_id)
+):
+    product = db.query(Product).filter(Product.id == id, Product.empresa_id == eid).first()
+    if not product:
+        raise HTTPException(404, "Producto no encontrado")
+    for field, value in payload.dict().items():
+        setattr(product, field, value)
+    db.commit()
+    db.refresh(product)
+    logger.info(f"✏️ Producto '{product.name}' actualizado por {user.email}")
+    return product
+
 @app.delete("/products/{id}", tags=["products"])
 def delete_product(
     id: int,
@@ -651,7 +676,7 @@ def delete_lot(
 @app.put("/lots/{id}", response_model=LotOut, tags=["lots"])
 def update_lot(
     id: int,
-    payload: LotCreate,
+    payload: LotUpdate,
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
     eid: int = Depends(get_empresa_id)
@@ -739,7 +764,12 @@ def create_movement(
     if payload.type == MovementType.SALIDA and lot.expiry_date <= date.today():
         raise HTTPException(403, "❌ Lote vencido. No se puede usar para SALIDA.")
 
-    if payload.type in (MovementType.SALIDA, MovementType.MERMA):
+    reason_lower = (payload.reason or "").lower()
+    is_ajuste_negativo = (
+        payload.type == MovementType.AJUSTE
+        and ("merma" in reason_lower or "reducción" in reason_lower or "reduccion" in reason_lower)
+    )
+    if payload.type in (MovementType.SALIDA, MovementType.MERMA) or is_ajuste_negativo:
         if lot.qty_current < payload.qty:
             raise HTTPException(400, f"Stock insuficiente. Disponible: {lot.qty_current}")
         lot.qty_current -= payload.qty
